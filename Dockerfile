@@ -6,7 +6,7 @@ ENV GOPATH /go
 ENV GOBIN /go/bin
 ENV SKY_OWNER_PATH /go/src/github.com/skydb
 ENV SKY_BRANCH llvm
-ENN SKY_PORT 8589
+ENV SKY_PORT 8589
 
 RUN mkdir -p $GOBIN
 
