@@ -17,12 +17,12 @@ RUN cd $SKY_OWNER_PATH && \
     tar zxvf sky.tar.gz && \
     mv sky-$SKY_BRANCH sky && \
     cd sky && \
-    make build && \
+    make get && \
     cd $GOPATH/src/github.com/axw/gollvm && source install.sh && \
-    cd $SKY_OWNER_PATH/sky && go build -a -o /usr/local/bin/skyd
+    cd $SKY_OWNER_PATH/sky && make build
 
 CMD ["-port $SKY_PORT"]
 
-ENTRYPOINT /usr/local/bin/skyd
+ENTRYPOINT /go/bin/skyd
 
 EXPOSE $SKY_PORT
