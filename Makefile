@@ -27,10 +27,7 @@ run: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go run main.go
 
 build: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go build -v .
-
-install: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go install .
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go build -a -o skyd
 
 get:
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go get .
