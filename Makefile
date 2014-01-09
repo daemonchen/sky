@@ -1,5 +1,5 @@
-CFLAGS=`llvm-config-3.4 --cflags`
-LDFLAGS="`llvm-config-3.4 --ldflags` -Wl,-L`llvm-config-3.4 --libdir` -lLLVM-`llvm-config-3.4 --version`"
+CFLAGS=`llvm-config --cflags`
+LDFLAGS="`llvm-config --ldflags` -Wl,-L`llvm-config --libdir` -lLLVM-`llvm-config --version`"
 COVERPROFILE=/tmp/c.out
 TEST=.
 PKG=./...
