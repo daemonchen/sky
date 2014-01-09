@@ -6,7 +6,7 @@ PKG=./...
 
 default: build
 
-flags:
+env:
 	@echo "CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS)"
 
 grammar:

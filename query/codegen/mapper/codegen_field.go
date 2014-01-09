@@ -32,7 +32,6 @@ func (m *Mapper) codegenField(node *ast.Field, tbl *ast.Symtable, index int) (ll
 	m.br(body)
 
 	m.builder.SetInsertPointAtEnd(body)
-	/*
 	event := m.load(m.structgep(m.load(cursor), cursorEventElementIndex), "event")
 	if node.IsAggregate() {
 		if err := m.codegenAggregateField(node, tbl, event, result); err != nil {
@@ -41,7 +40,6 @@ func (m *Mapper) codegenField(node *ast.Field, tbl *ast.Symtable, index int) (ll
 	} else {
 		panic("UNIMPLEMENTED")
 	}
-	*/
 	m.br(exit)
 
 	m.builder.SetInsertPointAtEnd(exit)

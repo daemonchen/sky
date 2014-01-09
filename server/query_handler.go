@@ -142,11 +142,9 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	for result := range results {
 		switch result := result.(type) {
 		case *hashmap.Hashmap:
-			t2 := bench("reduce")
 			if err := r.Reduce(result); err != nil {
 				return nil, err
 			}
-			bench("reduce", t2)
 		case error:
 			return nil, result
 		}

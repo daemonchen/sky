@@ -127,6 +127,15 @@ void sky_mdb_iterate(MDB_cursor *lmdb_cursor) {
     }
 
     while(1) {
+        while(1) {
+            rc = mdb_cursor_get(lmdb_cursor, &key, &data, MDB_NEXT_DUP);
+            if(rc == MDB_NOTFOUND) {
+                break;
+            } else if(rc != 0) {
+                fprintf(stderr, "sky_mdb_iterate MDB_NEXT_DUP error: %s\n", mdb_strerror(rc));
+                return;
+            }
+        }
 
         rc = mdb_cursor_get(lmdb_cursor, &key, &data, MDB_NEXT_NODUP);
         if(rc != 0) {
@@ -134,6 +143,8 @@ void sky_mdb_iterate(MDB_cursor *lmdb_cursor) {
             return;
         }
     }
+
+    return;
 }
 
 */
