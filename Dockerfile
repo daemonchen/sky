@@ -22,3 +22,5 @@ RUN cd $SKY_OWNER_PATH && \
 CMD ["-port 8589"]
 
 ENTRYPOINT /usr/local/bin/skyd
+
+EXPOSE 8589
