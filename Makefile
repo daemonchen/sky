@@ -3,6 +3,7 @@ LDFLAGS="`llvm-config --ldflags` -Wl,-L`llvm-config --libdir` -lLLVM-`llvm-confi
 COVERPROFILE=/tmp/c.out
 TEST=.
 PKG=./...
+GO=/usr/local/go/bin/go
 
 default: build
 
@@ -13,23 +14,23 @@ grammar:
 	${MAKE} -C query/parser
 
 test: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go test -v -test.run=$(TEST) $(PKG)
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) $(PKG)
 
 cover: fmt
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go test -v -test.run=$(TEST) -coverprofile=$(COVERPROFILE) $(PKG)
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) -coverprofile=$(COVERPROFILE) $(PKG)
 	go tool cover -html=$(COVERPROFILE)
 	rm $(COVERPROFILE)
 
 bench: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go test -v -test.bench=. $(PKG)
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.bench=. $(PKG)
 
 run: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go run main.go
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run main.go
 
 build: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go build -a -o skyd
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -a -o skyd .
 
 get:
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go get .
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) get .
 
 .PHONY: test
