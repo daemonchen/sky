@@ -32,4 +32,7 @@ build: grammar
 install: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go install .
 
+get:
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) go get .
+
 .PHONY: test
