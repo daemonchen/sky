@@ -11,6 +11,7 @@ import (
 )
 
 const maxKeySize = 500
+const cacheSize = 1000
 
 // Factorizer object manages the factorization and defactorization of values.
 type Factorizer interface {
@@ -31,6 +32,7 @@ type factorizer struct {
 	noSync     bool
 	maxDBs     uint
 	maxReaders uint
+	caches     map[string]map[string]*cache
 }
 
 // NewFactorizer returns a new LMDB-backed Factorizer.
@@ -88,6 +90,9 @@ func (f *factorizer) Open() error {
 		return fmt.Errorf("factor env open error: %s", err)
 	}
 
+	// Initialize the cache.
+	f.caches = make(map[string]map[string]*cache)
+
 	return nil
 }
 
@@ -99,6 +104,8 @@ func (f *factorizer) Close() {
 }
 
 func (f *factorizer) close() {
+	f.caches = nil
+
 	if f.env != nil {
 		f.env.Close()
 		f.env = nil
@@ -112,12 +119,18 @@ func (f *factorizer) Factorize(tablespace string, id string, value string, creat
 		return 0, nil
 	}
 
+	// Check the LRU first.
+	c := f.cache(tablespace, id)
+	if sequence, ok := c.getValue(value); ok {
+		return sequence, nil
+	}
+
 	// Otherwise find it in the database.
 	data, exists, err := f.get(tablespace, f.key(id, value))
 	if err != nil {
 		return 0, err
 	}
-	// If key does exist then parse and return it.
+	// If key does exist then parse it and return it.
 	if exists {
 		return strconv.ParseUint(string(data), 10, 64)
 	}
@@ -137,16 +150,8 @@ func (f *factorizer) add(tablespace string, id string, value string) (uint64, er
 	f.Lock()
 	defer f.Unlock()
 
-	// Retry factorize within the context of the lock.
-	sequence, err := f.Factorize(tablespace, id, value, false)
-	if err == nil {
-		return sequence, nil
-	} else if _, ok := err.(*FactorNotFound); !ok {
-		return 0, err
-	}
-
 	// Retrieve next id in sequence.
-	sequence, err = f.inc(tablespace, id)
+	sequence, err := f.inc(tablespace, id)
 	if err != nil {
 		return 0, err
 	}
@@ -160,6 +165,10 @@ func (f *factorizer) add(tablespace string, id string, value string) (uint64, er
 		return 0, err
 	}
 
+	// Add to cache.
+	c := f.cache(tablespace, id)
+	c.add(value, sequence)
+
 	return sequence, nil
 }
 
@@ -170,6 +179,12 @@ func (f *factorizer) Defactorize(tablespace string, id string, value uint64) (st
 		return "", nil
 	}
 
+	// Check the cache first.
+	c := f.cache(tablespace, id)
+	if key, ok := c.getKey(value); ok {
+		return key, nil
+	}
+
 	// Find it in the database.
 	data, exists, err := f.get(tablespace, f.revkey(id, value))
 	if err != nil {
@@ -178,6 +193,10 @@ func (f *factorizer) Defactorize(tablespace string, id string, value uint64) (st
 	if !exists {
 		return "", fmt.Errorf("factor value does not exist: %v", f.revkey(id, value))
 	}
+
+	// Add to cache.
+	c.add(string(data), value)
+
 	return string(data), nil
 }
 
@@ -324,6 +343,22 @@ func (f *factorizer) put(tablespace string, key string, value string) error {
 	}
 
 	return nil
+}
+
+// cache returns a reference to the LRU cache used for a given tablespace/id.
+// If a cache doesn't exist then one will be created.
+func (f *factorizer) cache(tablespace string, id string) *cache {
+	m := f.caches[tablespace]
+	if m == nil {
+		m = make(map[string]*cache)
+		f.caches[tablespace] = m
+	}
+	c := m[id]
+	if c == nil {
+		c = newCache(cacheSize)
+		m[id] = c
+	}
+	return c
 }
 
 // truncate returns the value that can be saved to the factorizer because of LMDB key size restrictions.
