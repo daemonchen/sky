@@ -1,3 +1,6 @@
+# BUILD-USING:        docker build .
+# RUN-USING:          docker run -p 8585:8585 -v $SKY_DATA_DIR:/var/lib/sky:rw
+
 FROM skydb/dependencies-unstable
 
 MAINTAINER Sky Contributors skydb.io
