@@ -26,6 +26,11 @@ func (s *Server) addTableHandlers() {
 	s.ApiHandleFunc("/tables/{name}/keys", func(w http.ResponseWriter, req *http.Request, params map[string]interface{}) (interface{}, error) {
 		return s.tableKeysHandler(w, req, params)
 	}).Methods("GET")
+
+	// HACK(benbjohnson): Temporary fix for event timestamp duplication issue.
+	s.ApiHandleFunc("/tables/{name}/dedupe", func(w http.ResponseWriter, req *http.Request, params map[string]interface{}) (interface{}, error) {
+		return s.tableDedupeHandler(w, req, params)
+	}).Methods("GET")
 }
 
 // GET /tables
@@ -98,4 +103,15 @@ func (s *Server) tableKeysHandler(w http.ResponseWriter, req *http.Request, para
 	sort.Strings(keys)
 
 	return keys, nil
+}
+
+// GET /tables/:name/objects/dedupe
+func (s *Server) tableDedupeHandler(w http.ResponseWriter, req *http.Request, params map[string]interface{}) (interface{}, error) {
+	vars := mux.Vars(req)
+	t, err := s.OpenTable(vars["name"])
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, s.db.Dedupe(t.Name)
 }

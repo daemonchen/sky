@@ -433,6 +433,94 @@ func (s *shard) drop(tablespace string) error {
 	return nil
 }
 
+// HACK(benbjohnson): Temporary fix for event timestamp duplication issue.
+func (s *shard) Dedupe(tablespace string) error {
+	s.Lock()
+	defer s.Unlock()
+
+	keys, err := s.getAllKeys(tablespace)
+	if err != nil {
+		return err
+	}
+
+	// Loop over all keys and dedupe.
+	for _, key := range keys {
+		events, _, err := s.getEvents(tablespace, key)
+		if err != nil {
+			return fmt.Errorf("dedupe get events error: %s", err)
+		}
+
+		// Deduplicate events.
+		newEvents := dedupeEvents(events)
+
+		// Only reinsert if we have duplication.
+		if len(newEvents) != len(events) {
+			fmt.Printf("dedupe(%s) %d -> %d\n", len(events), len(newEvents))
+
+			// Delete all events for key.
+			txn, dbi, err := s.txn(tablespace, false)
+			if err != nil {
+				return fmt.Errorf("dedupe txn error: %s", err)
+			}
+			if err = txn.Del(dbi, []byte(key), nil); err != nil && err != mdb.NotFound {
+				txn.Commit()
+				return fmt.Errorf("dedupe delete error: %s", err)
+			}
+			txn.Commit()
+
+			if err := s.insertEvents(tablespace, key, newEvents, true); err != nil {
+				return fmt.Errorf("dedupe insert error: %s", err)
+			}
+		}
+	}
+	fmt.Printf("DEDUPE KEYS PROCESSED: %d\n", len(keys))
+
+	return nil
+}
+
+func (s *shard) getAllKeys(tablespace string) ([]string, error) {
+	txn, dbi, err := s.txn(tablespace, true)
+	if err != nil {
+		return nil, fmt.Errorf("allkeys txn error: %s", err)
+	}
+	defer txn.Commit()
+
+	c, err := txn.CursorOpen(dbi)
+	if err != nil {
+		return nil, fmt.Errorf("allkeys cursor open error: %s", err)
+	}
+	defer c.Close()
+
+	// Find all keys.
+	var keys []string
+	for {
+		key, _, err := c.Get(nil, mdb.NEXT)
+		if err == mdb.NotFound {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("allkeys get error: %s", err)
+		}
+		keys = append(keys, string(key))
+	}
+
+	return keys, nil
+}
+
+func dedupeEvents(events []*core.Event) []*core.Event {
+	// Create a map that overwrites earlier events with new one with the same timestamp.
+	m := make(map[string]*core.Event)
+	for _, event := range events {
+		m[event.Timestamp.Round(time.Microsecond).String()] = event
+	}
+
+	// Convert map to slice. This will get sorted during insertion.
+	var output []*core.Event
+	for _, event := range m {
+		output = append(output, event)
+	}
+	return output
+}
+
 func (s *shard) txn(name string, readOnly bool) (*mdb.Txn, mdb.DBI, error) {
 	var flags uint = 0
 	if readOnly {

@@ -31,6 +31,7 @@ type DB interface {
 	DeleteEvents(tablespace string, id string) error
 	Merge(tablespace string, destinationId string, sourceId string) error
 	Drop(tablespace string) error
+	Dedupe(tablespace string) error
 }
 
 // db is the default implementation of the DB interface.
@@ -266,6 +267,17 @@ func (db *db) Drop(tablespace string) error {
 	var err error
 	for _, s := range db.shards {
 		if _err := s.Drop(tablespace); err == nil {
+			err = _err
+		}
+	}
+	return err
+}
+
+// HACK(benbjohnson): Temporary fix for event timestamp duplication issue.
+func (db *db) Dedupe(tablespace string) error {
+	var err error
+	for _, s := range db.shards {
+		if _err := s.Dedupe(tablespace); err == nil {
 			err = _err
 		}
 	}
