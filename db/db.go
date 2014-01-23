@@ -17,7 +17,7 @@ import (
 type DB interface {
 	Open() error
 	Close()
-	Factorizer() Factorizer
+	Factorizer() *Factorizer
 	TableFactorizer(tablespace string) TableFactorizer
 	Cursors(tablespace string) (Cursors, error)
 	GetEvent(tablespace string, id string, timestamp time.Time) (*core.Event, error)
@@ -35,7 +35,7 @@ type DB interface {
 type db struct {
 	sync.RWMutex
 	defaultShardCount int
-	factorizer        Factorizer
+	factorizer *Factorizer
 	path              string
 	shards            []*shard
 	noSync            bool
@@ -45,7 +45,10 @@ type db struct {
 
 // Creates a new DB instance with data storage at the given path.
 func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReaders uint) DB {
-	f := NewFactorizer(filepath.Join(path, "factors"), noSync, maxDBs, maxReaders)
+	f := NewFactorizer(filepath.Join(path, "factors"))
+	f.NoSync = noSync
+	f.MaxDBs = maxDBs
+	f.MaxReaders = maxReaders
 
 	// Default the shard count to the number of logical cores.
 	if defaultShardCount == 0 {
@@ -150,7 +153,7 @@ func (db *db) shardCount() (int, error) {
 }
 
 // Factorizer returns the database's factorizer.
-func (db *db) Factorizer() Factorizer {
+func (db *db) Factorizer() *Factorizer {
 	return db.factorizer
 }
 

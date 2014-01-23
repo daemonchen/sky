@@ -42,8 +42,10 @@ func (h *eventHandler) getEvents(s *Server, req Request) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := s.db.Factorizer().DefactorizeEvents(events, t.Name, t.PropertyFile()); err != nil {
-		return nil, err
+	for _, event := range events {
+		if err := s.db.Factorizer().DefactorizeEvent(event, t.Name, t.PropertyFile()); err != nil {
+			return nil, err
+		}
 	}
 	return t.SerializeEvents(events)
 }

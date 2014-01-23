@@ -7,7 +7,7 @@ type TableFactorizer interface {
 }
 
 // NewTableFactorizer creates a new TableFactorizer instance.
-func NewTableFactorizer(f Factorizer, tablespace string) TableFactorizer {
+func NewTableFactorizer(f *Factorizer, tablespace string) TableFactorizer {
 	return &tableFactorizer{
 		f:          f,
 		tablespace: tablespace,
@@ -15,7 +15,7 @@ func NewTableFactorizer(f Factorizer, tablespace string) TableFactorizer {
 }
 
 type tableFactorizer struct {
-	f          Factorizer
+	f          *Factorizer
 	tablespace string
 }
 
