@@ -135,28 +135,7 @@ func (s *shard) insertEvents(tablespace string, id string, newEvents []*core.Eve
 		}
 	}
 	if appendOnly {
-
-		// Dedup the list of new events
-		events := make([]*core.Event, 0, len(newEvents))
-		for _, newEvent := range newEvents {
-			merged := false
-			for index, event := range events {
-				if newEvent.Timestamp.Equal(event.Timestamp.Round(time.Microsecond)) {
-					if replace {
-						events[index] = newEvent
-					} else {
-						event.Merge(newEvent)
-					}
-					merged = true
-				}
-			}
-			if !merged {
-				events = append(events, newEvent)
-			}
-		}
-
-		// Append all new events
-		return s.appendEvents(tablespace, id, events, state, data)
+		return s.appendEvents(tablespace, id, newEvents, state, data)
 	}
 
 	// Retrieve the events and state for the object.
@@ -165,25 +144,20 @@ func (s *shard) insertEvents(tablespace string, id string, newEvents []*core.Eve
 		return err
 	}
 
-	// Create event lookup
-	eventsMap := make(map[time.Time]int)
-	for index, event := range events {
-		eventsMap[event.Timestamp] = index
-	}
-
 	// Append all the new events and sort.
 	for _, newEvent := range newEvents {
-
 		// Merge events with an existing timestamp.
 		merged := false
-		if index, ok := eventsMap[newEvent.Timestamp]; ok {
-			if replace {
-				events[index] = newEvent
-			} else {
-				events[index].Merge(newEvent)
+		for index, event := range events {
+			if event.Timestamp.Equal(newEvent.Timestamp.Round(time.Microsecond)) {
+				if replace {
+					events[index] = newEvent
+				} else {
+					event.Merge(newEvent)
+				}
+				merged = true
+				break
 			}
-			merged = true
-			break
 		}
 
 		// If no existing events exist then just append to the end.
