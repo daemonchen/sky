@@ -28,7 +28,7 @@ func TestDedupeEvents(t *testing.T) {
 	event1 := dedupedEvents[0]
 	assert.Equal(t, event1.Timestamp, now)
 	assert.Equal(t, event1.Data[1], "foo")
-	// assert.Equal(t, event1.Data[2], "bar")
+	assert.Equal(t, event1.Data[2], "bar")
 	assert.Equal(t, event1.Data[3], 12)
 
 	event2 := dedupedEvents[1]

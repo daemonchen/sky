@@ -536,6 +536,13 @@ func dedupeEvents(events []*core.Event) []*core.Event {
 	// Create a map that overwrites earlier events with new one with the same timestamp.
 	m := make(map[string]*core.Event)
 	for _, event := range events {
+		if existingEvent, eventExists := m[event.Timestamp.Round(time.Microsecond).String()]; eventExists {
+			for k, v := range existingEvent.Data {
+				if _, attrExists := event.Data[k]; !attrExists {
+					event.Data[k] = v
+				}
+			}
+		}
 		m[event.Timestamp.Round(time.Microsecond).String()] = event
 	}
 
