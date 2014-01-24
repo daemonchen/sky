@@ -481,7 +481,8 @@ func (s *shard) Dedupe(tablespace string) error {
 
 		// Only reinsert if we have duplication.
 		if len(newEvents) != len(events) {
-			fmt.Printf("dedupe(%s) %d -> %d\n", len(events), len(newEvents))
+			fmt.Printf("dedupe events for object %s\n", key)
+			fmt.Printf("dedupe(%s) %+v -> %+v\n", key, events, newEvents)
 
 			// Delete all events for key.
 			txn, dbi, err := s.txn(tablespace, false)
@@ -551,6 +552,7 @@ func dedupeEvents(events []*core.Event) []*core.Event {
 	for _, event := range m {
 		output = append(output, event)
 	}
+
 	return output
 }
 
