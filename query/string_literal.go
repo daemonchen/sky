@@ -40,7 +40,7 @@ func (l *StringLiteral) Codegen() (string, error) {
 			if variable.Association != "" {
 				targetName = variable.Association
 			}
-			sequence, err := query.factorizer.Factorize(query.table.Name, targetName, l.value, false)
+			sequence, err := query.factorizer.Factorize(targetName, l.value, false)
 			if _, ok := err.(*db.FactorNotFound); ok {
 				return "0", nil
 			} else if err != nil {

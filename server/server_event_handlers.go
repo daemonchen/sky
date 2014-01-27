@@ -56,7 +56,11 @@ func (s *Server) getEventsHandler(w http.ResponseWriter, req *http.Request, para
 	// Denormalize events.
 	output := make([]map[string]interface{}, 0)
 	for _, event := range events {
-		if err = s.db.Factorizer().DefactorizeEvent(event, t.Name, t.PropertyFile()); err != nil {
+		f, err := s.db.Factorizer(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		if err := f.DefactorizeEvent(event, t.PropertyFile()); err != nil {
 			return nil, err
 		}
 		e, err := t.SerializeEvent(event)
@@ -104,7 +108,11 @@ func (s *Server) getEventHandler(w http.ResponseWriter, req *http.Request, param
 	}
 
 	// Convert an event to a serializable object.
-	if err = s.db.Factorizer().DefactorizeEvent(event, t.Name, t.PropertyFile()); err != nil {
+	f, err := s.db.Factorizer(t.Name)
+	if err != nil {
+		return nil, err
+	}
+	if err := f.DefactorizeEvent(event, t.PropertyFile()); err != nil {
 		return nil, err
 	}
 	e, err := t.SerializeEvent(event)
@@ -127,8 +135,12 @@ func (s *Server) replaceEventHandler(w http.ResponseWriter, req *http.Request, p
 	if err != nil {
 		return nil, err
 	}
-	err = s.db.Factorizer().FactorizeEvent(event, t.Name, t.PropertyFile(), true)
+
+	f, err := s.db.Factorizer(t.Name)
 	if err != nil {
+		return nil, err
+	}
+	if err := f.FactorizeEvent(event, t.PropertyFile(), true); err != nil {
 		return nil, err
 	}
 
@@ -148,8 +160,11 @@ func (s *Server) updateEventHandler(w http.ResponseWriter, req *http.Request, pa
 	if err != nil {
 		return nil, err
 	}
-	err = s.db.Factorizer().FactorizeEvent(event, t.Name, t.PropertyFile(), true)
+	f, err := s.db.Factorizer(t.Name)
 	if err != nil {
+		return nil, err
+	}
+	if err := f.FactorizeEvent(event, t.PropertyFile(), true); err != nil {
 		return nil, err
 	}
 	return nil, s.db.InsertEvent(t.Name, vars["objectId"], event)
@@ -273,7 +288,11 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 			if err != nil {
 				return fmt.Errorf("Cannot deserialize: %v", err)
 			}
-			if err = s.db.Factorizer().FactorizeEvent(event, eventTable.Name, eventTable.PropertyFile(), true); err != nil {
+			f, err := s.db.Factorizer(eventTable.Name)
+			if err != nil {
+				return fmt.Errorf("Cannot open factorizer: %v", err)
+			}
+			if err := f.FactorizeEvent(event, eventTable.PropertyFile(), true); err != nil {
 				return fmt.Errorf("Cannot factorize: %v", err)
 			}
 
