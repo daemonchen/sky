@@ -43,7 +43,11 @@ func (h *eventHandler) getEvents(s *Server, req Request) (interface{}, error) {
 		return nil, err
 	}
 	for _, event := range events {
-		if err := s.db.Factorizer().DefactorizeEvent(event, t.Name, t.PropertyFile()); err != nil {
+		f, err := s.db.Factorizer(t.Name)
+		if err != nil {
+			return nil, err
+		}
+		if err := f.DefactorizeEvent(event, t.PropertyFile()); err != nil {
 			return nil, err
 		}
 	}
@@ -72,7 +76,11 @@ func (h *eventHandler) getEvent(s *Server, req Request) (interface{}, error) {
 	}
 
 	// Convert an event to a serializable object.
-	if err = s.db.Factorizer().DefactorizeEvent(event, t.Name, t.PropertyFile()); err != nil {
+	f, err := s.db.Factorizer(t.Name)
+	if err != nil {
+		return nil, err
+	}
+	if err := f.DefactorizeEvent(event, t.PropertyFile()); err != nil {
 		return nil, err
 	}
 	return t.SerializeEvent(event)
@@ -88,8 +96,12 @@ func (h *eventHandler) insertEvent(s *Server, req Request) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	err = s.db.Factorizer().FactorizeEvent(event, t.Name, t.PropertyFile(), true)
+
+	f, err := s.db.Factorizer(t.Name)
 	if err != nil {
+		return nil, err
+	}
+	if err = f.FactorizeEvent(event, t.PropertyFile(), true); err != nil {
 		return nil, err
 	}
 	return nil, s.db.InsertEvent(t.Name, req.Var("id"), event)
@@ -170,7 +182,12 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 			if err != nil {
 				return fmt.Errorf("Cannot deserialize: %v", err)
 			}
-			if err = s.db.Factorizer().FactorizeEvent(event, eventTable.Name, eventTable.PropertyFile(), true); err != nil {
+
+			f, err := s.db.Factorizer(eventTable.Name)
+			if err != nil {
+				return err
+			}
+			if err := f.FactorizeEvent(event, eventTable.PropertyFile(), true); err != nil {
 				return fmt.Errorf("Cannot factorize: %v", err)
 			}
 

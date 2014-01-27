@@ -90,7 +90,10 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	t0 = bench("query.validate", t0)
 
 	// Retrieve factorizer and database cursors.
-	f := s.db.TableFactorizer(t.Name)
+	f, err := s.db.Factorizer(t.Name)
+	if err != nil {
+		return nil, err
+	}
 	cursors, err := s.db.Cursors(t.Name)
 	if err != nil {
 		return nil, err

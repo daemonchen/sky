@@ -17,8 +17,7 @@ import (
 type DB interface {
 	Open() error
 	Close()
-	Factorizer() *Factorizer
-	TableFactorizer(tablespace string) TableFactorizer
+	Factorizer(tablespace string) (*Factorizer, error)
 	Cursors(tablespace string) (Cursors, error)
 	GetEvent(tablespace string, id string, timestamp time.Time) (*core.Event, error)
 	GetEvents(tablespace string, id string) ([]*core.Event, error)
@@ -34,22 +33,18 @@ type DB interface {
 // db is the default implementation of the DB interface.
 type db struct {
 	sync.RWMutex
+	NoSync     bool
+	MaxDBs     uint
+	MaxReaders uint
+
 	defaultShardCount int
-	factorizer *Factorizer
-	path              string
-	shards            []*shard
-	noSync            bool
-	maxDBs            uint
-	maxReaders        uint
+	factorizers map[string]*Factorizer
+	path        string
+	shards      []*shard
 }
 
 // Creates a new DB instance with data storage at the given path.
 func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReaders uint) DB {
-	f := NewFactorizer(filepath.Join(path, "factors"))
-	f.NoSync = noSync
-	f.MaxDBs = maxDBs
-	f.MaxReaders = maxReaders
-
 	// Default the shard count to the number of logical cores.
 	if defaultShardCount == 0 {
 		defaultShardCount = runtime.NumCPU()
@@ -57,16 +52,20 @@ func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReader
 
 	return &db{
 		defaultShardCount: defaultShardCount,
-		factorizer:        f,
+		factorizers: make(map[string]*Factorizer),
 		path:              path,
-		noSync:            noSync,
-		maxDBs:            maxDBs,
-		maxReaders:        maxReaders,
+		NoSync:            noSync,
+		MaxDBs:            maxDBs,
+		MaxReaders:        maxReaders,
 	}
 }
 
 func (db *db) dataPath() string {
 	return filepath.Join(db.path, "data")
+}
+
+func (db *db) factorsPath() string {
+	return filepath.Join(db.path, "factors")
 }
 
 func (db *db) shardPath(index int) string {
@@ -82,9 +81,7 @@ func (db *db) Open() error {
 	if err := os.MkdirAll(db.dataPath(), 0700); err != nil {
 		return err
 	}
-
-	// Open factorizer.
-	if err := db.factorizer.Open(); err != nil {
+	if err := os.MkdirAll(db.factorsPath(), 0700); err != nil {
 		return err
 	}
 
@@ -98,7 +95,7 @@ func (db *db) Open() error {
 	db.shards = make([]*shard, 0)
 	for i := 0; i < shardCount; i++ {
 		db.shards = append(db.shards, newShard(db.shardPath(i)))
-		if err := db.shards[i].Open(db.maxDBs, db.maxReaders, options(db.noSync)); err != nil {
+		if err := db.shards[i].Open(db.MaxDBs, db.MaxReaders, options(db.NoSync)); err != nil {
 			db.close()
 			return err
 		}
@@ -112,10 +109,14 @@ func (db *db) Close() {
 	db.Lock()
 	defer db.Unlock()
 	db.close()
-	db.factorizer.Close()
 }
 
 func (db *db) close() {
+	for _, f := range db.factorizers {
+		f.Close()
+	}
+	db.factorizers = nil
+
 	for _, s := range db.shards {
 		s.Close()
 	}
@@ -152,14 +153,51 @@ func (db *db) shardCount() (int, error) {
 	return count, nil
 }
 
-// Factorizer returns the database's factorizer.
-func (db *db) Factorizer() *Factorizer {
-	return db.factorizer
+// LockAll obtains locks on the database and all shards.
+func (db *db) LockAll() {
+	db.Lock()
+	for _, s := range db.shards {
+		s.Lock()
+	}
 }
 
-// TableFactorizer returns a factorizer specific to one table.
-func (db *db) TableFactorizer(tablespace string) TableFactorizer {
-	return NewTableFactorizer(db.factorizer, tablespace)
+// UnlockAll releases locks on the database and all shards.
+// Only use this with LockAll().
+func (db *db) UnlockAll() {
+	db.Unlock()
+	for _, s := range db.shards {
+		s.Unlock()
+	}
+}
+
+// Factorizer returns a table's factorizer.
+func (db *db) Factorizer(tablespace string) (*Factorizer, error) {
+	db.Lock()
+	defer db.Unlock()
+	return db.factorizer(tablespace)
+}
+
+func (db *db) factorizer(tablespace string) (*Factorizer, error) {
+	// Retrieve already open factorizer if available.
+	if f := db.factorizers[tablespace]; f != nil {
+		return f, nil
+	}
+
+	// Otherwise create a new factorizer for the table.
+	f := NewFactorizer()
+	f.NoSync = db.NoSync
+	f.MaxDBs = db.MaxDBs
+	f.MaxReaders = db.MaxReaders
+
+	path := filepath.Join(db.factorsPath(), tablespace)
+	if err := f.Open(path); err != nil {
+		return nil, err
+	}
+
+	// Save the open factorizer to the lookup.
+	db.factorizers[tablespace] = f
+
+	return f, nil
 }
 
 // Cursors retrieves a set of cursors for iterating over the database.

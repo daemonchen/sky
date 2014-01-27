@@ -101,7 +101,10 @@ func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[
 		q.Finalize()
 
 		// Setup factor test data.
-		f := db.TableFactorizer("TBL")
+		f, err := db.Factorizer("TBL")
+		if err != nil {
+			return err
+		}
 		f.Factorize("action", "A0", true)
 		f.Factorize("action", "A1", true)
 		f.Factorize("factorVariable", "XXX", true)
@@ -143,7 +146,12 @@ func runDBMapReducer(shardCount int, query string, decls ast.VarDecls, objects m
 	q.Finalize()
 
 	err := runDBMappers(shardCount, query, decls, objects, func(db db.DB, results []*hashmap.Hashmap) error {
-		r := reducer.New(q, db.TableFactorizer("TBL"))
+		f, err := db.Factorizer("TBL")
+		if err != nil {
+			return err
+		}
+		
+		r := reducer.New(q, f)
 		for _, result := range results {
 			if err := r.Reduce(result); err != nil {
 				return err
