@@ -15,13 +15,13 @@ func TestServerEventUpdate(t *testing.T) {
 		setupTestProperty("foo", "baz", true, "integer")
 
 		// Send two new events.
-		code, _ := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", `{"data":{"bar":"myValue", "baz":12}}`)
+		code, _ := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00.123456111Z", `{"data":{"bar":"myValue", "baz":12}}`)
 		assert.Equal(t, code, 200)
 		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", `{"data":{"bar":"myValue2"}}`)
 		assert.Equal(t, code, 200)
 
 		// Merge new events.
-		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", `{"data":{"bar":"myValue3", "baz":1000}}`)
+		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00.123456222Z", `{"data":{"bar":"myValue3", "baz":1000}}`)
 		assert.Equal(t, code, 200)
 		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", `{"data":{"bar":"myValue2", "baz":20}}`)
 		assert.Equal(t, code, 200)
@@ -31,7 +31,7 @@ func TestServerEventUpdate(t *testing.T) {
 		assert.Equal(t, code, 200)
 		if resp, ok := resp.([]interface{}); assert.True(t, ok) {
 			assert.Equal(t, len(resp), 2)
-			assert.Equal(t, jsonenc(resp[0]), `{"data":{"bar":"myValue3","baz":1000},"timestamp":"2012-01-01T02:00:00Z"}`)
+			assert.Equal(t, jsonenc(resp[0]), `{"data":{"bar":"myValue3","baz":1000},"timestamp":"2012-01-01T02:00:00.123456Z"}`)
 			assert.Equal(t, jsonenc(resp[1]), `{"data":{"bar":"myValue2","baz":20},"timestamp":"2012-01-01T03:00:00Z"}`)
 		}
 
