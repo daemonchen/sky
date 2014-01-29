@@ -196,6 +196,16 @@ func TestDBCursors(t *testing.T) {
 	})
 }
 
+func TestDBStats(t *testing.T) {
+	withDB(0, func(db *db) {
+		count, err := db.shardCount()
+		assert.Nil(t, err, "")
+		stats, err := db.Stats()
+		assert.Nil(t, err, "")
+		assert.Equal(t, len(stats), count)
+	})
+}
+
 func TestDBDrop(t *testing.T) {
 	withDB(0, func(db *db) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
