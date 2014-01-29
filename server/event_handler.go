@@ -117,6 +117,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		table, err = s.OpenTable(tableName)
 		if err != nil {
 			s.logger.Printf("ERR %v", err)
+			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, `{"message":"%v"}`, err)
 			return
 		}
@@ -195,7 +196,9 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 
 	if err != nil {
 		s.logger.Printf("ERR %v", err)
-		fmt.Fprintf(w, `{"message":"%v"}`, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"message":"%v", "events_written":%v}`, err, events_written)
+		return
 	}
 
 	fmt.Fprintf(w, `{"events_written":%v}`, events_written)
