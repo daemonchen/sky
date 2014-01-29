@@ -102,7 +102,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	if err != nil {
 		return nil, err
 	}
-	m.Dump()
+	// m.Dump()
 
 	t0 = bench("query.codegen", t0)
 

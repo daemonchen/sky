@@ -87,6 +87,8 @@ func (s *shard) Cursor(tablespace string) (*mdb.Cursor, error) {
 
 	c, err := s.cursor(txn, dbi)
 	if err != nil {
+		c.Close()
+		txn.Commit()
 		return nil, err
 	}
 
