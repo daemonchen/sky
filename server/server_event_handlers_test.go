@@ -164,13 +164,15 @@ func TestServerStreamUpdateEventsFlushesOnThreshold(t *testing.T) {
 
 		// Send a second event.
 		client.Write(`{"id":"xyz","table":"foo","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}` + "\n")
-
 		client.Flush()
+
+		// Give the server time to flush.
+		time.Sleep(100 * time.Millisecond)
 
 		// Assert that the events were flushed
 		resp, err = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/objects/xyz/events", "application/json", "")
 		assert.NoError(t, err)
-		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /events failed.")
+		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /events flushed failed.")
 
 		// Close streaming request.
 		ret := client.Close()
@@ -182,7 +184,7 @@ func TestServerStreamUpdateEventsFlushesOnThreshold(t *testing.T) {
 		// Ensure events exist.
 		resp, err = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/objects/xyz/events", "application/json", "")
 		assert.NoError(t, err)
-		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /events failed.")
+		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /events exist failed.")
 	})
 }
 

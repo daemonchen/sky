@@ -17,7 +17,7 @@ const maxKeySize = 500
 // This cache size is per-property.
 const cacheSize = 1000
 
-// Factorizer manages the factorization and defactorization of values.
+// Factorizer manages the factorization and defactorization of values for a table.
 type Factorizer struct {
 	sync.Mutex
 
@@ -27,15 +27,14 @@ type Factorizer struct {
 
 	env    *mdb.Env
 	path   string
-	caches map[string]map[string]*cache
+	caches map[string]*cache
 	txn    *mdb.Txn
 	dirty  bool
 }
 
 // NewFactorizer returns a new Factorizer instance.
-func NewFactorizer(path string) *Factorizer {
+func NewFactorizer() *Factorizer {
 	return &Factorizer{
-		path:       path,
 		NoSync:     true,
 		MaxDBs:     4096,
 		MaxReaders: 126,
@@ -47,8 +46,9 @@ func (f *Factorizer) Path() string {
 	return f.path
 }
 
-// Open allocates a new LMDB environment.
-func (f *Factorizer) Open() error {
+// Open opens a new LMDB environment at the given path.
+// If an environment does not exist then a new one is created.
+func (f *Factorizer) Open(path string) error {
 	var err error
 
 	f.Lock()
@@ -58,6 +58,7 @@ func (f *Factorizer) Open() error {
 	f.close()
 
 	// Initialize and open a new environment.
+	f.path = path
 	if err := os.MkdirAll(f.path, 0700); err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func (f *Factorizer) Open() error {
 	}
 
 	// Initialize the cache.
-	f.caches = make(map[string]map[string]*cache)
+	f.caches = make(map[string]*cache)
 
 	return nil
 }
@@ -109,6 +110,7 @@ func (f *Factorizer) Close() {
 }
 
 func (f *Factorizer) close() {
+	f.path = ""
 	f.caches = nil
 
 	if f.env != nil {
@@ -118,26 +120,25 @@ func (f *Factorizer) close() {
 }
 
 // Factorize converts a value for a property into a numeric identifier.
-// If a value has already been factorized then it is reused. Otherwise a new
-// one is created.
-func (f *Factorizer) Factorize(tablespace string, id string, value string, createIfMissing bool) (uint64, error) {
+// If a value has already been factorized then it is reused. Otherwise a new one is created.
+func (f *Factorizer) Factorize(id string, value string, createIfMissing bool) (uint64, error) {
 	f.Lock()
 	defer f.Unlock()
 	defer f.renew()
-	return f.factorize(tablespace, id, value, createIfMissing)
+	return f.factorize(id, value, createIfMissing)
 }
 
 // Defactorize converts a previously factorized value from its numeric identifier
 // to its string representation.
-func (f *Factorizer) Defactorize(tablespace string, id string, value uint64) (string, error) {
+func (f *Factorizer) Defactorize(id string, value uint64) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 	defer f.renew()
-	return f.defactorize(tablespace, id, value)
+	return f.defactorize(id, value)
 }
 
 // FactorizeEvent converts all the values of an event into their numeric identifiers.
-func (f *Factorizer) FactorizeEvent(event *core.Event, tablespace string, propertyFile *core.PropertyFile, createIfMissing bool) error {
+func (f *Factorizer) FactorizeEvent(event *core.Event, propertyFile *core.PropertyFile, createIfMissing bool) error {
 	if event == nil {
 		return nil
 	}
@@ -150,7 +151,7 @@ func (f *Factorizer) FactorizeEvent(event *core.Event, tablespace string, proper
 		property := propertyFile.GetProperty(k)
 		if property.DataType == core.FactorDataType {
 			if stringValue, ok := v.(string); ok {
-				sequence, err := f.factorize(tablespace, property.Name, stringValue, createIfMissing)
+				sequence, err := f.factorize(property.Name, stringValue, createIfMissing)
 				if err != nil {
 					return err
 				}
@@ -163,7 +164,7 @@ func (f *Factorizer) FactorizeEvent(event *core.Event, tablespace string, proper
 }
 
 // DefactorizeEvent converts all the values of an event from their numeric identifiers to their string values.
-func (f *Factorizer) DefactorizeEvent(event *core.Event, tablespace string, propertyFile *core.PropertyFile) error {
+func (f *Factorizer) DefactorizeEvent(event *core.Event, propertyFile *core.PropertyFile) error {
 	if event == nil {
 		return nil
 	}
@@ -198,7 +199,7 @@ func (f *Factorizer) DefactorizeEvent(event *core.Event, tablespace string, prop
 			case float64:
 				sequence = uint64(v)
 			}
-			stringValue, err := f.defactorize(tablespace, property.Name, uint64(sequence))
+			stringValue, err := f.defactorize(property.Name, uint64(sequence))
 			if err != nil {
 				return err
 			}
@@ -208,25 +209,25 @@ func (f *Factorizer) DefactorizeEvent(event *core.Event, tablespace string, prop
 
 	return nil
 }
-func (f *Factorizer) factorize(tablespace string, id string, value string, createIfMissing bool) (uint64, error) {
+func (f *Factorizer) factorize(id string, value string, createIfMissing bool) (uint64, error) {
 	// Blank is always zero.
 	if value == "" {
 		return 0, nil
 	}
 
 	// Check the LRU first.
-	c := f.cache(tablespace, id)
+	c := f.cache(id)
 	if sequence, ok := c.getValue(value); ok {
 		return sequence, nil
 	}
 
 	// Otherwise find it in the database.
-	dbi, err := f.txn.DBIOpen(&tablespace, mdb.CREATE)
+	dbi, err := f.txn.DBIOpen(&id, mdb.CREATE)
 	if err != nil {
 		return 0, fmt.Errorf("factor factorize dbi error: %s", err)
 	}
 
-	data, err := f.get(dbi, f.key(id, value))
+	data, err := f.get(dbi, f.key(value))
 	if err != nil {
 		return 0, err
 	} else if data != nil {
@@ -235,66 +236,66 @@ func (f *Factorizer) factorize(tablespace string, id string, value string, creat
 
 	// Create a new factor if requested.
 	if createIfMissing {
-		return f.add(dbi, tablespace, id, value)
+		return f.add(dbi, id, value)
 	}
 
-	err = NewFactorNotFound(fmt.Sprintf("skyd: Factor not found: %v", f.key(id, value)))
+	err = NewFactorNotFound(fmt.Sprintf("factor not found: %s: %v", id, f.key(value)))
 	return 0, err
 }
 
 // add creates a new factor for a given value.
-func (f *Factorizer) add(dbi mdb.DBI, tablespace string, id string, value string) (uint64, error) {
+func (f *Factorizer) add(dbi mdb.DBI, id string, value string) (uint64, error) {
 	// Retrieve next id in sequence.
-	sequence, err := f.nextid(dbi, id)
+	sequence, err := f.nextid(dbi)
 	if err != nil {
 		return 0, err
 	}
 
 	// Truncate the value so it fits in our max key size.
-	value = f.truncate(id, value)
+	value = f.truncate(value)
 
 	// Store the value-to-id lookup.
 	var data [8]byte
 	binary.BigEndian.PutUint64(data[:], sequence)
-	if err := f.put(dbi, f.key(id, value), data[:]); err != nil {
+	if err := f.put(dbi, f.key(value), data[:]); err != nil {
 		return 0, err
 	}
 
 	// Save the id-to-value lookup.
-	if err := f.put(dbi, f.revkey(id, sequence), []byte(value)); err != nil {
+	if err := f.put(dbi, f.revkey(sequence), []byte(value)); err != nil {
 		return 0, err
 	}
 
 	// Add to cache.
-	c := f.cache(tablespace, id)
+	c := f.cache(id)
 	c.add(value, sequence)
 
 	return sequence, nil
 }
 
-func (f *Factorizer) defactorize(tablespace string, id string, value uint64) (string, error) {
+func (f *Factorizer) defactorize(id string, value uint64) (string, error) {
 	// Blank is always zero.
 	if value == 0 {
 		return "", nil
 	}
 
 	// Check the cache first.
-	c := f.cache(tablespace, id)
+	c := f.cache(id)
 	if key, ok := c.getKey(value); ok {
 		return key, nil
 	}
 
 	// Otherwise find it in the database.
-	dbi, err := f.txn.DBIOpen(&tablespace, mdb.CREATE)
+	dbi, err := f.txn.DBIOpen(&id, mdb.CREATE)
 	if err != nil {
 		return "", fmt.Errorf("factor defactorize dbi error: %s", err)
 	}
 
-	data, err := f.get(dbi, f.revkey(id, value))
+	data, err := f.get(dbi, f.revkey(value))
 	if err != nil {
 		return "", err
 	} else if data == nil {
-		return "", fmt.Errorf("factor not found: %v", f.revkey(id, value))
+		return "", fmt.Errorf("factor not found: %v", f.revkey(value))
 	}
 
 	// Add to cache.
@@ -304,8 +305,8 @@ func (f *Factorizer) defactorize(tablespace string, id string, value uint64) (st
 }
 
 // Retrieves the next available sequence number within a table for an id.
-func (f *Factorizer) nextid(dbi mdb.DBI, id string) (uint64, error) {
-	seqkey := f.seqkey(id)
+func (f *Factorizer) nextid(dbi mdb.DBI) (uint64, error) {
+	seqkey := "+"
 	data, err := f.get(dbi, seqkey)
 	if err != nil {
 		return 0, err
@@ -371,43 +372,29 @@ func (f *Factorizer) renew() error {
 
 // cache returns a reference to the LRU cache used for a given tablespace/id.
 // If a cache doesn't exist then one will be created.
-func (f *Factorizer) cache(tablespace string, id string) *cache {
-	m := f.caches[tablespace]
-	if m == nil {
-		m = make(map[string]*cache)
-		f.caches[tablespace] = m
-	}
-	c := m[id]
+func (f *Factorizer) cache(id string) *cache {
+	c := f.caches[id]
 	if c == nil {
 		c = newCache(cacheSize)
-		m[id] = c
+		f.caches[id] = c
 	}
 	return c
 }
 
-// The key for a given id/value.
-func (f *Factorizer) key(id string, value string) string {
-	if s := fmt.Sprintf("%x:%s>%s", len(id), id, value); len(s) <= maxKeySize {
-		return s
-	}
-	return fmt.Sprintf("%x:%s>%s", len(id), id, f.truncate(id, value))
+// The key for a given value.
+func (f *Factorizer) key(value string) string {
+	return fmt.Sprintf(">%s", f.truncate(value))
 }
 
-// The reverse key for a given id/value.
-func (f *Factorizer) revkey(id string, value uint64) string {
-	return fmt.Sprintf("%x:%s<%d", len(id), id, value)
-}
-
-// The sequence key for a given id.
-func (f *Factorizer) seqkey(id string) string {
-	return fmt.Sprintf("%x:%s!", len(id), id)
+// The reverse key for a given value.
+func (f *Factorizer) revkey(value uint64) string {
+	return fmt.Sprintf("<%d", value)
 }
 
 // truncate returns the value that can be saved to the factorizer because of LMDB key size restrictions.
-func (f *Factorizer) truncate(id string, value string) string {
-	size := maxKeySize - len(fmt.Sprintf("%x:%s>", len(id), id))
-	if size < len(value) {
-		return value[0:size]
+func (f *Factorizer) truncate(value string) string {
+	if len(value) > maxKeySize {
+		return value[0:maxKeySize]
 	}
 	return value
 }

@@ -359,7 +359,7 @@ func (s *Selection) defactorize(data interface{}, index int) error {
 						factorDimension = variable.Association
 					}
 
-					stringValue, err := query.factorizer.Defactorize(query.table.Name, factorDimension, uint64(sequence))
+					stringValue, err := query.factorizer.Defactorize(factorDimension, uint64(sequence))
 					if err != nil {
 						return err
 					}
@@ -408,7 +408,7 @@ func (s *Selection) defactorizeNonAggregateFields(data interface{}) error {
 								factorName = variable.Association
 							}
 
-							stringValue, err := query.factorizer.Defactorize(query.table.Name, factorName, uint64(sequence))
+							stringValue, err := query.factorizer.Defactorize(factorName, uint64(sequence))
 							if err != nil {
 								return err
 							}

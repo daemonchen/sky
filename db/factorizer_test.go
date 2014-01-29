@@ -12,20 +12,20 @@ import (
 // Ensure that we can factorize and defactorize values.
 func TestFactorizer(t *testing.T) {
 	withFactorizer(func(f *Factorizer) {
-		num, err := f.Factorize("foo", "bar", "/index.html", true)
+		num, err := f.Factorize("bar", "/index.html", true)
 		if err != nil || num != 1 {
 			t.Fatalf("Wrong factorization: exp: %v, got: %v (%v)", 1, num, err)
 		}
-		num, err = f.Factorize("foo", "bar", "/about.html", true)
+		num, err = f.Factorize("bar", "/about.html", true)
 		if err != nil || num != 2 {
 			t.Fatalf("Wrong factorization: exp: %v, got: %v (%v)", 2, num, err)
 		}
 
-		str, err := f.Defactorize("foo", "bar", 1)
+		str, err := f.Defactorize("bar", 1)
 		if err != nil || str != "/index.html" {
 			t.Fatalf("Wrong defactorization: exp: %v, got: %v (%v)", "/index.html", str, err)
 		}
-		str, err = f.Defactorize("foo", "bar", 2)
+		str, err = f.Defactorize("bar", 2)
 		if err != nil || str != "/about.html" {
 			t.Fatalf("Wrong defactorization: exp: %v, got: %v (%v)", "/about.html", str, err)
 		}
@@ -36,14 +36,14 @@ func TestFactorizer(t *testing.T) {
 func TestFactorizerTruncate(t *testing.T) {
 	withFactorizer(func(f *Factorizer) {
 		value := "012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-		shortValue := f.truncate("foo", value)
-		num, err := f.Factorize("foo", "bar", value, true)
+		shortValue := f.truncate(value)
+		num, err := f.Factorize("bar", value, true)
 		assert.Equal(t, num, uint64(1))
 		assert.NoError(t, err)
-		str, err := f.Defactorize("foo", "bar", 1)
-		assert.Equal(t, len(str), 494)
+		str, err := f.Defactorize("bar", 1)
+		assert.Equal(t, len(str), 500)
 		assert.NoError(t, err)
-		num2, err := f.Factorize("foo", "bar", shortValue, true)
+		num2, err := f.Factorize("bar", shortValue, true)
 		assert.Equal(t, num2, uint64(1))
 		assert.NoError(t, err)
 	})
@@ -53,7 +53,7 @@ func BenchmarkFactorizer(b *testing.B) {
 	withFactorizer(func(f *Factorizer) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			f.Factorize("foo", "bar", strconv.Itoa(i), true)
+			f.Factorize("bar", strconv.Itoa(i), true)
 		}
 	})
 }
@@ -62,7 +62,7 @@ func BenchmarkFactorizerCache(b *testing.B) {
 	withFactorizer(func(f *Factorizer) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			f.Factorize("foo", "bar", strconv.Itoa(i%2), true)
+			f.Factorize("bar", strconv.Itoa(i%2), true)
 		}
 	})
 }
@@ -71,8 +71,8 @@ func withFactorizer(fn func(f *Factorizer)) {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
-	f := NewFactorizer(path)
-	if err := f.Open(); err != nil {
+	f := NewFactorizer()
+	if err := f.Open(path); err != nil {
 		panic(err.Error())
 	}
 	defer f.Close()

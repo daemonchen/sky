@@ -16,9 +16,9 @@ func TestDB(t *testing.T) {
 	db := New("/tmp/sky", true, 1000, 100).(*db)
 	assert.Equal(t, db.dataPath(), "/tmp/sky/data", "")
 	assert.Equal(t, db.shardPath(2), "/tmp/sky/data/2", "")
-	assert.Equal(t, int(db.maxDBs), 1000, "")
-	assert.Equal(t, db.maxReaders, uint(100), "")
-	assert.Equal(t, db.noSync, true, "")
+	assert.Equal(t, int(db.MaxDBs), 1000, "")
+	assert.Equal(t, db.MaxReaders, uint(100), "")
+	assert.Equal(t, db.NoSync, true, "")
 }
 
 func TestDBInsertEvent(t *testing.T) {

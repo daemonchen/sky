@@ -29,11 +29,16 @@ func (s *Server) statsHandler(w http.ResponseWriter, req *http.Request, params m
 		return nil, err
 	}
 
+	f, err := s.db.Factorizer(table.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// Run a simple count query.
 	q, _ := query.NewParser().ParseString("SELECT count() AS count")
 	q.Prefix = req.FormValue("prefix")
 	q.SetTable(table)
-	q.SetFactorizer(s.db.Factorizer())
+	q.SetFactorizer(f)
 
 	return s.RunQuery(table, q)
 }
@@ -97,6 +102,11 @@ func (s *Server) parseQuery(table *core.Table, params map[string]interface{}) (*
 		raw = params
 	}
 
+	f, err := s.db.Factorizer(table.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// Parse query if passed as a string. Otherwise deserialize JSON.
 	var q *query.Query
 	if str, ok := raw.(string); ok {
@@ -110,7 +120,7 @@ func (s *Server) parseQuery(table *core.Table, params map[string]interface{}) (*
 		}
 	}
 	q.SetTable(table)
-	q.SetFactorizer(s.db.Factorizer())
+	q.SetFactorizer(f)
 
 	return q, nil
 }
