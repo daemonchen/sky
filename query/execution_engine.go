@@ -1,7 +1,9 @@
 package query
 
 /*
-#cgo LDFLAGS: -lluajit-5.1 -llmdb
+#cgo LDFLAGS: -L/usr/local/lib -llmdb -lluajit-5.1
+#cgo CFLAGS: -I/usr/local/include
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
