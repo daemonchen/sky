@@ -163,54 +163,27 @@ func (s *shard) insertEvents(tablespace string, id string, newEvents []*core.Eve
 		return nil
 	}
 
-	// Sort events in timestamp order.
-	sort.Sort(core.EventList(newEvents))
+	// Sort and dedupe events.
+	newEvents = core.EventList(newEvents).Normalize().Sort().Dedupe()
 
 	// Check the current state and perform an optimized append if possible.
 	state, data, err := s.getState(tablespace, id)
-	var appendOnly bool
-	if state == nil {
-		appendOnly = true
-	} else {
-		for _, newEvent := range newEvents {
-			if !state.Timestamp.Before(newEvent.Timestamp) {
-				appendOnly = false
-				break
-			}
-		}
+	if err != nil {
+		return err
 	}
-	if appendOnly {
+	if state == nil || state.Timestamp.Before(newEvents[0].Timestamp) {
+		// Append all new events
 		return s.appendEvents(tablespace, id, newEvents, state, data)
 	}
 
 	// Retrieve the events and state for the object.
-	events, state, err := s.getEvents(tablespace, id)
+	oldEvents, state, err := s.getEvents(tablespace, id)
 	if err != nil {
 		return err
 	}
 
-	// Append all the new events and sort.
-	for _, newEvent := range newEvents {
-		// Merge events with an existing timestamp.
-		merged := false
-		for index, event := range events {
-			if event.Timestamp.Equal(newEvent.Timestamp.Round(time.Microsecond)) {
-				if replace {
-					events[index] = newEvent
-				} else {
-					event.Merge(newEvent)
-				}
-				merged = true
-				break
-			}
-		}
-
-		// If no existing events exist then just append to the end.
-		if !merged {
-			events = append(events, newEvent)
-		}
-	}
-	sort.Sort(core.EventList(events))
+	// Merge new events into old
+	events := core.EventList(oldEvents).Merge(newEvents)
 
 	// Deduplicate permanent state.
 	state = &core.Event{Data: map[int64]interface{}{}}
@@ -220,11 +193,8 @@ func (s *shard) insertEvents(tablespace string, id string, newEvents []*core.Eve
 		state.MergePermanent(event)
 	}
 
-	// Remove all empty events.
-	events = []*core.Event(core.EventList(events).NonEmptyEvents())
-
 	// Write events back to the database.
-	err = s.setEvents(tablespace, id, events, state)
+	err = s.setEvents(tablespace, id, []*core.Event(events.NonEmptyEvents()), state)
 	if err != nil {
 		return err
 	}
@@ -476,6 +446,57 @@ func (s *shard) drop(tablespace string) error {
 	}
 
 	return nil
+}
+
+func (s *shard) getAllKeys(tablespace string) ([]string, error) {
+	txn, dbi, err := s.txn(tablespace, true)
+	if err != nil {
+		return nil, fmt.Errorf("allkeys txn error: %s", err)
+	}
+	defer txn.Commit()
+
+	c, err := txn.CursorOpen(dbi)
+	if err != nil {
+		return nil, fmt.Errorf("allkeys cursor open error: %s", err)
+	}
+	defer c.Close()
+
+	// Find all keys.
+	var keys []string
+	for {
+		key, _, err := c.Get(nil, mdb.NEXT)
+		if err == mdb.NotFound {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("allkeys get error: %s", err)
+		}
+		keys = append(keys, string(key))
+	}
+
+	return keys, nil
+}
+
+func dedupeEvents(events []*core.Event) []*core.Event {
+	// Create a map that overwrites earlier events with new one with the same timestamp.
+	m := make(map[string]*core.Event)
+	for _, event := range events {
+		if existingEvent, eventExists := m[event.Timestamp.Round(time.Microsecond).String()]; eventExists {
+			for k, v := range existingEvent.Data {
+				if _, attrExists := event.Data[k]; !attrExists {
+					event.Data[k] = v
+				}
+			}
+		}
+		m[event.Timestamp.Round(time.Microsecond).String()] = event
+	}
+
+	// Convert map to slice. This will get sorted during insertion.
+	var output []*core.Event
+	for _, event := range m {
+		output = append(output, event)
+	}
+
+	return output
 }
 
 func (s *shard) txn(name string, readOnly bool) (*mdb.Txn, mdb.DBI, error) {

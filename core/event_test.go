@@ -60,3 +60,50 @@ func TestDedupe(t *testing.T) {
 		t.Fatalf("Invalid dedupe: %v", a.Data)
 	}
 }
+
+// Ensure that EventList is duplicate values of two events can be deduplicated.
+func TestEventListDeduping(t *testing.T) {
+	a := NewEvent("1980-01-01T00:00:00Z", map[int64]interface{}{1: 1, 2: "foo", 3: "baz"})
+	b := NewEvent("1980-01-01T00:00:00Z", map[int64]interface{}{1: 2, 2: "bar", 3: "baz"})
+	c := NewEvent("1970-01-01T00:00:00Z", map[int64]interface{}{1: 3, 2: "foo", 3: "baz"})
+	d := NewEvent("1990-01-01T00:00:00Z", map[int64]interface{}{1: 4, 2: "foo", 3: "baz"})
+	e := NewEvent("1980-01-01T00:00:00Z", map[int64]interface{}{1: 5, 2: "baz", 3: "baz"})
+	f := NewEvent("1990-01-01T00:00:00Z", map[int64]interface{}{1: 6, 2: "bar", 3: "baz"})
+	list := EventList([]*Event{a, b, c, d, e, f}).Normalize().Sort().Dedupe()
+	expected := []*Event{c, a, d}
+
+	if len(list) != len(expected) {
+		t.Fatalf("Wrong merged list size: %v", len(list))
+	}
+
+	for index, event := range expected {
+		if list[index] != event {
+			t.Fatalf("Wrong item %d in the merged list: %v", index, list[index])
+		}
+	}
+}
+
+// Ensure that EventList is duplicate values of two events can be deduplicated.
+func TestEventListMerging(t *testing.T) {
+	a := NewEvent("1970-01-01T00:00:00Z", map[int64]interface{}{1: 1})
+	b := NewEvent("1980-01-01T00:00:00Z", map[int64]interface{}{1: 2})
+	c := NewEvent("1990-01-01T00:00:00Z", map[int64]interface{}{1: 3})
+	d := NewEvent("1975-01-01T00:00:00Z", map[int64]interface{}{1: 4})
+	e := NewEvent("1980-01-01T00:00:00Z", map[int64]interface{}{1: 5})
+	f := NewEvent("1985-01-01T00:00:00Z", map[int64]interface{}{1: 6})
+	new := []*Event{a, b, c}
+	old := []*Event{d, e, f}
+	expected := []*Event{a, d, b, f, c}
+
+	merged := EventList(new).Merge(old)
+
+	if len(merged) != len(expected) {
+		t.Fatalf("Wrong merged list size: %v", len(merged))
+	}
+
+	for index, event := range expected {
+		if merged[index] != event {
+			t.Fatalf("Wrong item %d in the merged list: %v", index, merged[index])
+		}
+	}
+}
