@@ -41,6 +41,7 @@ func (m *Mapper) codegenSessionLoop(node *ast.SessionLoop, tbl *ast.Symtable) (l
 	exit := m.context.AddBasicBlock(fn, "exit")
 
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace(node.ClauseString())
 	cursor_ref := m.alloca(llvm.PointerType(m.cursorType, 0), "cursor")
 	result_ref := m.alloca(llvm.PointerType(m.hashmapType, 0), "result")
 	m.store(fn.Param(0), cursor_ref)

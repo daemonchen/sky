@@ -35,6 +35,7 @@ func (m *Mapper) codegenEventLoop(node *ast.EventLoop, tbl *ast.Symtable) (llvm.
 	exit := m.context.AddBasicBlock(fn, "exit")
 
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace("FOR EACH EVENT")
 	cursor_ref := m.alloca(llvm.PointerType(m.cursorType, 0), "cursor")
 	result_ref := m.alloca(llvm.PointerType(m.hashmapType, 0), "result")
 	m.store(fn.Param(0), cursor_ref)

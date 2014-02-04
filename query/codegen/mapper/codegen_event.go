@@ -111,6 +111,7 @@ func (m *Mapper) codegenCursorNextEventFunc() {
 
 	// Allocate stack.
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace("cursor_next_event()")
 	cursor := m.alloca(llvm.PointerType(m.cursorType, 0), "cursor")
 	key := m.alloca(m.mdbValType, "key")
 	data := m.alloca(m.mdbValType, "data")
@@ -212,6 +213,7 @@ func (m *Mapper) codegenEventCopyFunc(functionName string, filter func(*ast.VarD
 	fn := llvm.AddFunction(m.module, functionName, fntype)
 
 	m.builder.SetInsertPointAtEnd(m.context.AddBasicBlock(fn, "entry"))
+	m.trace(functionName + "()")
 	dest := m.alloca(llvm.PointerType(m.eventType, 0), "dest")
 	src := m.alloca(llvm.PointerType(m.eventType, 0), "src")
 	m.store(fn.Param(0), dest)
@@ -241,6 +243,7 @@ func (m *Mapper) codegenEventResetFunc(functionName string, filter func(*ast.Var
 	fn := llvm.AddFunction(m.module, functionName, fntype)
 
 	m.builder.SetInsertPointAtEnd(m.context.AddBasicBlock(fn, "entry"))
+	m.trace(functionName + "()")
 	event := m.alloca(llvm.PointerType(m.eventType, 0), "event")
 	m.store(fn.Param(0), event)
 
@@ -293,6 +296,7 @@ func (m *Mapper) codegenReadEventFunc() llvm.Value {
 	//     int64_t key_count;
 	//     int64_t key_index = 0;
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace("cursor_read_event()")
 	event := m.alloca(llvm.PointerType(m.eventType, 0), "event")
 	ptr := m.alloca(llvm.PointerType(m.context.Int8Type(), 0), "ptr")
 	sz := m.alloca(m.context.Int64Type(), "sz")

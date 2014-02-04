@@ -21,3 +21,12 @@ func (m *Mapper) printf(format string, values ...interface{}) llvm.Value {
 	}
 	return m.builder.CreateCall(m.module.NamedFunction("printf"), vals, "")
 }
+
+// trace inserts a "printf"-style call at the current builder position if the
+// Mapper has TraceEnabled set to true.
+func (m *Mapper) trace(format string, values ...interface{}) llvm.Value {
+	if m.TraceEnabled {
+		return m.printf("[trace] " + format + "\n", values...)
+	}
+	return nilValue
+}

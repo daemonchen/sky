@@ -19,9 +19,13 @@ func NewSessionLoop() *SessionLoop {
 	return &SessionLoop{}
 }
 
-func (l *SessionLoop) String() string {
+func (l *SessionLoop) ClauseString() string {
 	quantity, units := SecondsToTimeSpan(l.IdleDuration)
-	str := fmt.Sprintf("FOR EACH SESSION DELIMITED BY %d %s\n", quantity, units)
+	return fmt.Sprintf("FOR EACH SESSION DELIMITED BY %d %s", quantity, units)
+}
+
+func (l *SessionLoop) String() string {
+	str := l.ClauseString() + "\n"
 	str += lineStartRegex.ReplaceAllString(l.Statements.String(), "  ") + "\n"
 	str += "END"
 	return str

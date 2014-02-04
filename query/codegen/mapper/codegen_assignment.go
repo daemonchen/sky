@@ -20,6 +20,7 @@ func (m *Mapper) codegenAssignment(node *ast.Assignment, tbl *ast.Symtable) (llv
 	exit := m.context.AddBasicBlock(fn, "exit")
 
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace(node.String())
 	cursor := m.alloca(llvm.PointerType(m.cursorType, 0), "cursor")
 	result := m.alloca(llvm.PointerType(m.hashmapType, 0), "result")
 	m.store(fn.Param(0), cursor)

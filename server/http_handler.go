@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -95,10 +96,12 @@ func (h *httpHandler) writeJSONResponse(w http.ResponseWriter, resp Response) {
 
 	if resp.Error() != nil {
 		ret := map[string]interface{}{"message": resp.Error().Error()}
+		json.NewEncoder(os.Stderr).Encode(ret)
 		if err := json.NewEncoder(w).Encode(ret); err != nil {
 			h.server.logger.Printf("server: encoding error[err]: %v", err)
 		}
 	} else if resp.Data() != nil {
+		json.NewEncoder(os.Stderr).Encode(resp.Data())
 		if err := json.NewEncoder(w).Encode(resp.Data()); err != nil {
 			h.server.logger.Printf("server: encoding error: %v", err)
 		}

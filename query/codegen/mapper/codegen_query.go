@@ -92,6 +92,7 @@ func (m *Mapper) codegenQueryEntryFunc(q *ast.Query, tbl *ast.Symtable) (llvm.Va
 	exit := m.context.AddBasicBlock(fn, "exit")
 
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace("entry()")
 	cursor_ref := m.alloca(llvm.PointerType(m.cursorType, 0), "cursor")
 	result := m.alloca(llvm.PointerType(m.hashmapType, 0), "result")
 	ptr := m.alloca(m.ptrtype(), "ptr")
@@ -129,6 +130,7 @@ func (m *Mapper) codegenQueryEntryFunc(q *ast.Query, tbl *ast.Symtable) (llvm.Va
 	m.builder.SetInsertPointAtEnd(exit)
 	m.builder.CreateFree(m.load(m.structgep(m.load(cursor_ref, ""), cursorEventElementIndex, ""), ""))
 	m.builder.CreateFree(m.load(m.structgep(m.load(cursor_ref, ""), cursorNextEventElementIndex, ""), ""))
+	m.trace("entry() [EXIT]")
 	m.retvoid()
 
 	return fn, nil

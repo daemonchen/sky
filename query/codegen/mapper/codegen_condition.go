@@ -53,6 +53,7 @@ func (m *Mapper) codegenCondition(node *ast.Condition, tbl *ast.Symtable) (llvm.
 	exit := m.context.AddBasicBlock(fn, "exit")
 
 	m.builder.SetInsertPointAtEnd(entry)
+	m.trace(node.ClauseString())
 	cursor := m.alloca(llvm.PointerType(m.cursorType, 0), "cursor")
 	result := m.alloca(llvm.PointerType(m.hashmapType, 0), "result")
 	index := m.alloca(m.context.Int64Type(), "index")

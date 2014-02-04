@@ -33,8 +33,8 @@ func NewCondition() *Condition {
 	}
 }
 
-// Converts the condition to a string-based representation.
-func (c *Condition) String() string {
+// Returns the non-statements part of the condition as a string.
+func (c *Condition) ClauseString() string {
 	str := "WHEN"
 	if c.Expression != nil {
 		str += " " + c.Expression.String()
@@ -42,6 +42,12 @@ func (c *Condition) String() string {
 	if c.Start != 0 || c.End != 0 || c.UOM != UnitSteps {
 		str += fmt.Sprintf(" WITHIN %d .. %d %s", c.Start, c.End, strings.ToUpper(c.UOM))
 	}
+	return str
+}
+
+// Converts the condition to a string-based representation.
+func (c *Condition) String() string {
+	str := c.ClauseString()
 	str += " THEN\n"
 	str += lineStartRegex.ReplaceAllString(c.Statements.String(), "  ") + "\n"
 	str += "END"

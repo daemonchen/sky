@@ -25,6 +25,8 @@ func init() {
 // execution is single threaded and returns a nested map of data.
 // The results can be combined using a Reducer.
 type Mapper struct {
+	TraceEnabled bool
+
 	factorizer Factorizer
 
 	context llvm.Context
@@ -49,6 +51,7 @@ func New(q *ast.Query, f Factorizer) (*Mapper, error) {
 	defer mutex.Unlock()
 
 	m := new(Mapper)
+	m.TraceEnabled = true // FOR DEBUGGING ONLY
 	m.factorizer = f
 
 	m.context = llvm.NewContext()

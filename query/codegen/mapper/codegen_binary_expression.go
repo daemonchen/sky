@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/axw/gollvm/llvm"
 	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
 
@@ -151,7 +152,9 @@ func (m *Mapper) codegenFactorEquality(node *ast.BinaryExpression, lhs *ast.VarR
 
 		id, err := m.factorizer.Factorize(name, rhs.Value, false)
 		if err != nil {
-			return nilValue, err
+			if _, ok := err.(*db.FactorNotFound); !ok {
+				return nilValue, err
+			}
 		}
 		return m.icmp(op, lhsValue, m.constint(int(id)), ""), nil
 
