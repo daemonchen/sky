@@ -4,7 +4,6 @@ package mapper
 import "C"
 
 import (
-	"runtime"
 	"sync"
 	"unsafe"
 
@@ -57,7 +56,6 @@ func New(q *ast.Query, f Factorizer) (*Mapper, error) {
 	m.context = llvm.NewContext()
 	m.module = m.context.NewModule("mapper")
 	m.builder = llvm.NewBuilder()
-	runtime.SetFinalizer(m, finalize)
 
 	var err error
 	if err = q.Finalize(); err != nil {
@@ -90,8 +88,8 @@ func New(q *ast.Query, f Factorizer) (*Mapper, error) {
 	return m, nil
 }
 
-// finalize cleans up resources after the mapper goes out of scope.
-func finalize(m *Mapper) {
+// Close cleans up resources after the mapper goes out of scope.
+func (m *Mapper) Close() {
 	mutex.Lock()
 	defer mutex.Unlock()
 

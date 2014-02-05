@@ -10,7 +10,7 @@ import (
 	"github.com/skydb/sky/query/codegen/mapper"
 	"github.com/skydb/sky/query/codegen/reducer"
 	"github.com/skydb/sky/query/parser"
-	"github.com/szferi/gomdb"
+	//"github.com/szferi/gomdb"
 )
 
 // queryHandler handles the execute of queries against database tables.
@@ -101,11 +101,14 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	}
 	defer cursors.Close()
 
+	// TODO(benbjohnson): Add Mapper.Clone() and run each shard separately.
+
 	// Generate mapper code.
 	m, err := mapper.New(q, f)
 	if err != nil {
 		return nil, err
 	}
+	defer m.Close()
 	// m.Dump()
 
 	t0 = bench("query.codegen", t0)
@@ -119,7 +122,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	results := make(chan interface{}, count)
 	for _, cursor := range cursors {
 		wg.Add(1)
-		go func(cursor *mdb.Cursor) {
+		//go func(cursor *mdb.Cursor) {
 			result := hashmap.New()
 			if err := m.Map(cursor, prefix, result); err == nil {
 				results <- result
@@ -128,7 +131,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 			}
 			bench("map", t1)
 			wg.Done()
-		}(cursor)
+		//}(cursor)
 	}
 
 	// Don't exit function until all mappers finish.
