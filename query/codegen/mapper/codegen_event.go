@@ -5,6 +5,7 @@ import (
 
 	"github.com/axw/gollvm/llvm"
 	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
 
@@ -315,7 +316,7 @@ func (m *Mapper) codegenReadEventFunc() llvm.Value {
 	m.builder.SetInsertPointAtEnd(read_ts)
 	ts_value := m.load(m.builder.CreateBitCast(m.load(ptr, ""), llvm.PointerType(m.context.Int64Type(), 0), ""), "ts_value")
 	native_ts_value := m.call("llvm.bswap.i64", ts_value)
-	timestamp_value := m.builder.CreateLShr(native_ts_value, llvm.ConstInt(m.context.Int64Type(), core.SECONDS_BIT_OFFSET, false), "timestamp_value")
+	timestamp_value := m.builder.CreateLShr(native_ts_value, llvm.ConstInt(m.context.Int64Type(), db.SecondsBitOffset, false), "timestamp_value")
 	event_timestamp := m.structgep(m.load(event, ""), eventTimestampElementIndex, "event_timestamp")
 	m.store(timestamp_value, event_timestamp)
 	m.store(m.builder.CreateGEP(m.load(ptr, ""), []llvm.Value{llvm.ConstInt(m.context.Int64Type(), 8, false)}, ""), ptr)

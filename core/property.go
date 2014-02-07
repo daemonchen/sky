@@ -1,13 +1,12 @@
 package core
 
 import (
-	"fmt"
 	"regexp"
 )
 
 var (
-	InvalidPropertyNameError = fmt.Errorf("invalid property name")
-	InvalidPropertyDataTypeError = fmt.Errorf("invalid property data type")
+	InvalidPropertyNameError = &Error{"invalid property name", nil}
+	InvalidPropertyDataTypeError = &Error{"invalid property data type", nil}
 )
 
 // Property represents part of the schema for a Table.

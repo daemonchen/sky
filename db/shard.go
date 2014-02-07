@@ -166,7 +166,7 @@ func (s *shard) InsertEvent(tablespace string, id string, event *core.Event) err
 	}
 	defer c.Close()
 
-	if err := s.insertEvent(txn, dbi, c, id, core.ShiftTimeBytes(event.Timestamp), event.Data); err != nil {
+	if err := s.insertEvent(txn, dbi, c, id, shiftTimeBytes(event.Timestamp), event.Data); err != nil {
 		return err
 	}
 
@@ -226,7 +226,7 @@ func (s *shard) InsertEvents(tablespace string, id string, events []*core.Event)
 	defer c.Close()
 
 	for _, event := range events {
-		if err := s.insertEvent(txn, dbi, c, id, core.ShiftTimeBytes(event.Timestamp), event.Data); err != nil {
+		if err := s.insertEvent(txn, dbi, c, id, shiftTimeBytes(event.Timestamp), event.Data); err != nil {
 			return err
 		}
 	}
@@ -251,7 +251,7 @@ func (s *shard) GetEvent(tablespace string, id string, timestamp time.Time) (*co
 	}
 	defer c.Close()
 
-	data, err := s.getEvent(c, id, core.ShiftTimeBytes(timestamp))
+	data, err := s.getEvent(c, id, shiftTimeBytes(timestamp))
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (s *shard) GetEvents(tablespace string, id string) ([]*core.Event, error) {
 
 		// Create event.
 		event := &core.Event{
-			Timestamp: core.UnshiftTimeBytes(val[0:8]),
+			Timestamp: unshiftTimeBytes(val[0:8]),
 			Data:      make(map[int64]interface{}),
 		}
 
@@ -378,7 +378,7 @@ func (s *shard) DeleteEvent(tablespace string, id string, timestamp time.Time) e
 	defer c.Close()
 
 	// Check if event exists and move the cursor.
-	if old, err := s.getEvent(c, id, core.ShiftTimeBytes(timestamp)); err != nil {
+	if old, err := s.getEvent(c, id, shiftTimeBytes(timestamp)); err != nil {
 		return err
 	} else if old != nil {
 		if err := c.Del(0); err != nil {
