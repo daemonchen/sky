@@ -5,21 +5,12 @@ import (
 	"regexp"
 )
 
-//------------------------------------------------------------------------------
-//
-// Variables
-//
-//------------------------------------------------------------------------------
+var (
+	InvalidPropertyNameError = fmt.Errorf("invalid property name")
+	InvalidPropertyDataTypeError = fmt.Errorf("invalid property data type")
+)
 
-var validPropertyNameRegex = regexp.MustCompile(`^\w+$`)
-
-//------------------------------------------------------------------------------
-//
-// Typedefs
-//
-//------------------------------------------------------------------------------
-
-// A Property is a loose core column on a Table.
+// Property represents part of the schema for a Table.
 type Property struct {
 	Id        int64  `json:"id"`
 	Name      string `json:"name"`
@@ -27,77 +18,59 @@ type Property struct {
 	DataType  string `json:"dataType"`
 }
 
-//------------------------------------------------------------------------------
-//
-// Constructor
-//
-//------------------------------------------------------------------------------
-
-// NewProperty returns a new Property.
-func NewProperty(id int64, name string, transient bool, dataType string) (*Property, error) {
-	// Validate name.
-	if name == "" {
-		return nil, fmt.Errorf("Property name cannot be blank")
-	} else if !validPropertyNameRegex.MatchString(name) {
-		return nil, fmt.Errorf("Property name contains invalid characters: %s", name)
-	}
-
-	// Validate data type.
-	switch dataType {
-	case FactorDataType, StringDataType, IntegerDataType, FloatDataType, BooleanDataType:
-	default:
-		return nil, fmt.Errorf("Invalid property data type: %v", dataType)
-	}
-
-	return &Property{
-		Id:        id,
-		Name:      name,
-		Transient: transient,
-		DataType:  dataType,
-	}, nil
-}
-
-//------------------------------------------------------------------------------
-//
-// Methods
-//
-//------------------------------------------------------------------------------
-
-// Casts a value into this property's data type.
-func (p *Property) Cast(value interface{}) interface{} {
-	value = normalize(value)
-	switch p.DataType {
-	case FactorDataType, StringDataType:
-		if str, ok := value.(string); ok {
-			return str
-		} else {
+// Cast converts a value into the appropriate Go type based on the property's data type.
+func (p *Property) Cast(v interface{}) interface{} {
+	if p.DataType == FactorDataType || p.DataType == StringDataType {
+		switch v := v.(type) {
+		case string:
+			return v
+		default:
 			return ""
 		}
-
-	case IntegerDataType:
-		if intValue, ok := value.(int64); ok {
-			return intValue
-		} else if floatValue, ok := value.(float64); ok {
-			return int64(floatValue)
-		} else {
-			return int64(0)
+	} else if p.DataType == IntegerDataType {
+		switch v := promote(v).(type) {
+		case int64:
+			return v
+		case float64:
+			return int64(v)
+		default:
+			return 0
 		}
-
-	case FloatDataType:
-		if floatValue, ok := value.(float64); ok {
-			return floatValue
-		} else if intValue, ok := value.(int64); ok {
-			return float64(intValue)
-		} else {
-			return float64(0)
+	} else if p.DataType == FloatDataType {
+		switch v := promote(v).(type) {
+		case float64:
+			return v
+		case int64:
+			return float64(v)
+		default:
+			return 0
 		}
-
-	case BooleanDataType:
-		if boolValue, ok := value.(bool); ok {
-			return boolValue
-		} else {
+	} else if p.DataType == BooleanDataType {
+		switch v := v.(type) {
+		case bool:
+			return v
+		default:
 			return false
 		}
 	}
-	return value
+	return v
+}
+
+// Validate checks that the property is valid. Properties can be invalid if
+// non-alphanumeric characters are used in its name or if the data type is not
+// a valid type.
+func (p *Property) Validate() error {
+	// Validate that name is non-blank and doesn't contain invalid characters.
+	if p.Name == "" || !regexp.MustCompile(`^\w+$`).MatchString(p.Name) {
+		return InvalidPropertyNameError
+	}
+
+	// Validate data type.
+	switch p.DataType {
+	case FactorDataType, StringDataType, IntegerDataType, FloatDataType, BooleanDataType:
+	default:
+		return InvalidPropertyDataTypeError
+	}
+
+	return nil
 }

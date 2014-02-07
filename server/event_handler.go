@@ -72,7 +72,11 @@ func (h *eventHandler) getEvent(s *Server, req Request) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	} else if event == nil {
-		event = core.NewEvent(req.Var("timestamp"), map[int64]interface{}{})
+		t, err := time.Parse(time.RFC3339, req.Var("timestamp"))
+		if err != nil {
+			return nil, err
+		}
+		event = &core.Event{Timestamp: t, Data: make(map[int64]interface{})}
 	}
 
 	// Convert an event to a serializable object.

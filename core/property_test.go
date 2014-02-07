@@ -2,21 +2,18 @@ package core
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// Ensure that property names can use valid characters.
-func TestPropertyName(t *testing.T) {
-	if _, err := NewProperty(0, "Property_no2", false, "string"); err != nil {
-		t.Fatal("Property name:", err)
-	}
+// Ensure that property names cannot be blank.
+func TestPropertyValidateNameNonBlank(t *testing.T) {
+	p := &Property{DataType:"string"}
+	assert.Equal(t, p.Validate(), InvalidPropertyNameError)
 }
 
-// Ensure that property names cannot have illegal characters.
-func TestPropertyNameCannotContainInvalidCharacters(t *testing.T) {
-	if _, err := NewProperty(0, "has a space", false, "string"); err.Error() != "Property name contains invalid characters: has a space" {
-		t.Fatal("Invalid name:", err)
-	}
-	if _, err := NewProperty(0, "yes\\no", false, "string"); err.Error() != "Property name contains invalid characters: yes\\no" {
-		t.Fatal("Invalid name:", err)
-	}
+// Ensure that property names cannot have invalid characters.
+func TestPropertyValidateNameInvalidCharacters(t *testing.T) {
+	p := &Property{Name:`foo\bar`, DataType:"string"}
+	assert.Equal(t, p.Validate(), InvalidPropertyNameError)
 }

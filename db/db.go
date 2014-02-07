@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/hash"
 )
 
 // DB represents access to the low-level data store.
@@ -126,7 +127,7 @@ func (db *db) close() {
 
 // getShardByObjectId retrieves the appropriate shard for a given object identifier.
 func (db *db) getShardByObjectId(id string) *shard {
-	index := core.ObjectLocalHash(id) % uint32(len(db.shards))
+	index := hash.Local(id) % uint32(len(db.shards))
 	return db.shards[index]
 }
 

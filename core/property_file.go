@@ -76,8 +76,9 @@ func (p *PropertyFile) CreateProperty(name string, transient bool, dataType stri
 		return nil, errors.New("Property already exists.")
 	}
 
-	property, err := NewProperty(0, name, transient, dataType)
-	if err != nil {
+	// Create and validate property.
+	property := &Property{Name: name, Transient: transient, DataType:  dataType}
+	if err := property.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -147,8 +148,7 @@ func (p *PropertyFile) Reset() {
 // Adds system level properties that cannot be removed. System properties
 // have an id of zero.
 func (p *PropertyFile) addSystemProperties() {
-	property, _ := NewProperty(0, "timestamp", true, IntegerDataType)
-	p.properties = append(p.properties, property)
+	p.properties = append(p.properties, &Property{Name: "timestamp", Transient: true, DataType: IntegerDataType})
 }
 
 // Rebuilds the 'property by name' index.
