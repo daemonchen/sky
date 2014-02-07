@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Decode a configuration file.
+// Ensure that a configuration file can be decoded correctly.
 func TestDecode(t *testing.T) {
 	input := `
 port=9000
@@ -27,4 +27,18 @@ max-readers = 250
 	assert.Equal(t, config.NoSync, true)
 	assert.Equal(t, config.MaxDBs, uint(5))
 	assert.Equal(t, config.MaxReaders, uint(250))
+}
+
+// Ensure that a badly formatted config file returns an error.
+func TestDecodeBadConfig(t *testing.T) {
+	input := `
+port=9000
+data-path="/home
+`
+
+	config := NewConfig()
+	err := config.Decode(bytes.NewBufferString(input))
+	if assert.Error(t, err) {
+		assert.Equal(t, err.Error(), `Near line 3, key 'data-path': Near line 4: Strings cannot contain new lines.`)
+	}
 }

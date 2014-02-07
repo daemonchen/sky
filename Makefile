@@ -15,7 +15,7 @@ build: grammar
 
 cover: fmt
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) -coverprofile=$(COVERPROFILE) $(PKG)
-	go tool cover -html=$(COVERPROFILE)
+	go tool cover -html=$(COVERPROFILE) -o=coverage.html
 	rm $(COVERPROFILE)
 
 env:
