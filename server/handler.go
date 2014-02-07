@@ -56,7 +56,6 @@ func (h *ensurePropertyHandler) Serve(s *Server, req Request) (interface{}, erro
 	return h.handler.Serve(s, req)
 }
 
-
 // Checks that a map is passed into the body before passing off the handler.
 func EnsureMapHandler(handler Handler) Handler {
 	return &ensureMapHandler{handler}

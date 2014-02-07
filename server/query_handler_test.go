@@ -316,7 +316,7 @@ func TestServerPrefixQuery(t *testing.T) {
 		// Run query.
 		q := `SELECT sum(price) AS totalPrice`
 
-		_, resp := postJSON("/tables/foo/query", jsonenc(map[string]interface{}{"prefix":"001", "query": q}))
+		_, resp := postJSON("/tables/foo/query", jsonenc(map[string]interface{}{"prefix": "001", "query": q}))
 		assert.Equal(t, jsonenc(resp), `{"totalPrice":350}`)
 	})
 }

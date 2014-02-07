@@ -150,7 +150,7 @@ func runDBMapReducer(shardCount int, query string, decls ast.VarDecls, objects m
 		if err != nil {
 			return err
 		}
-		
+
 		r := reducer.New(q, f)
 		for _, result := range results {
 			if err := r.Reduce(result); err != nil {

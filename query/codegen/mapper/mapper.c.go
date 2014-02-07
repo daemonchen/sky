@@ -162,9 +162,9 @@ func sky_cursor_new(lmdb_cursor *mdb.Cursor, prefix string) *C.sky_cursor {
 }
 
 func sky_cursor_free(cursor *C.sky_cursor) {
-    C.sky_cursor_free(cursor)
+	C.sky_cursor_free(cursor)
 }
 
 func sky_mdb_iterate(lmdb_cursor *mdb.Cursor) {
-    C.sky_mdb_iterate(lmdb_cursor.MdbCursor())
+	C.sky_mdb_iterate(lmdb_cursor.MdbCursor())
 }

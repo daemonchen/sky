@@ -5,12 +5,6 @@ import (
 	"io"
 )
 
-//------------------------------------------------------------------------------
-//
-// Constants
-//
-//------------------------------------------------------------------------------
-
 const (
 	DefaultPort       = 8585
 	DefaultDataPath   = "/var/lib/sky"
@@ -19,12 +13,6 @@ const (
 	DefaultMaxDBs     = 4096
 	DefaultMaxReaders = 126 // lmdb's default
 )
-
-//------------------------------------------------------------------------------
-//
-// Typedefs
-//
-//------------------------------------------------------------------------------
 
 // The configuration for running Sky.
 type Config struct {
@@ -36,13 +24,7 @@ type Config struct {
 	MaxReaders uint   `toml:"max-readers"`
 }
 
-//------------------------------------------------------------------------------
-//
-// Constructor
-//
-//------------------------------------------------------------------------------
-
-// Creates a new configuration object.
+// NewConfig creates a new Config object with the default settings.
 func NewConfig() *Config {
 	return &Config{
 		Port:       DefaultPort,
@@ -54,13 +36,7 @@ func NewConfig() *Config {
 	}
 }
 
-//------------------------------------------------------------------------------
-//
-// Methods
-//
-//------------------------------------------------------------------------------
-
-// Reads the contents of configuration file and populates the config object.
+// Decode reads the contents of configuration file and populates the config object.
 // Any properties that are not set in the configuration file will default to
 // the value of the property before the decode.
 func (c *Config) Decode(r io.Reader) error {

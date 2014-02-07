@@ -26,7 +26,7 @@ func (m *Mapper) printf(format string, values ...interface{}) llvm.Value {
 // Mapper has TraceEnabled set to true.
 func (m *Mapper) trace(format string, values ...interface{}) llvm.Value {
 	if m.TraceEnabled {
-		return m.printf("[trace] " + format + "\n", values...)
+		return m.printf("[trace] "+format+"\n", values...)
 	}
 	return nilValue
 }

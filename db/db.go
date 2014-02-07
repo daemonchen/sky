@@ -39,9 +39,9 @@ type db struct {
 	MaxReaders uint
 
 	defaultShardCount int
-	factorizers map[string]*Factorizer
-	path        string
-	shards      []*shard
+	factorizers       map[string]*Factorizer
+	path              string
+	shards            []*shard
 }
 
 // Creates a new DB instance with data storage at the given path.
@@ -53,7 +53,7 @@ func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReader
 
 	return &db{
 		defaultShardCount: defaultShardCount,
-		factorizers: make(map[string]*Factorizer),
+		factorizers:       make(map[string]*Factorizer),
 		path:              path,
 		NoSync:            noSync,
 		MaxDBs:            maxDBs,

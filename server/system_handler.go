@@ -26,4 +26,3 @@ func (h *systemHandler) ping(s *Server, req Request) (interface{}, error) {
 func (h *systemHandler) stats(s *Server, req Request) (interface{}, error) {
 	return s.db.Stats()
 }
-

@@ -118,4 +118,3 @@ func (m *Mapper) Iterate(c *mdb.Cursor) {
 func (m *Mapper) Dump() {
 	m.module.Dump()
 }
-
