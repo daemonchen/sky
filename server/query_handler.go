@@ -38,7 +38,7 @@ func (h *queryHandler) query(s *Server, req Request) (interface{}, error) {
 		return nil, fmt.Errorf("server: map or string input required")
 	}
 	querystring, _ := data["query"].(string)
-	warn(querystring)
+	// warn(querystring)
 	return h.execute(s, req, querystring)
 }
 

@@ -7,30 +7,33 @@ GO=/usr/local/go/bin/go
 
 default: build
 
-env:
-	@echo "CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS)"
+bench: grammar
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.bench=. $(PKG)
 
-grammar:
-	${MAKE} -C query/parser
-
-test: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) $(PKG)
+build: grammar
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -a -o skyd .
 
 cover: fmt
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) -coverprofile=$(COVERPROFILE) $(PKG)
 	go tool cover -html=$(COVERPROFILE)
 	rm $(COVERPROFILE)
 
-bench: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.bench=. $(PKG)
+env:
+	@echo "CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS)"
 
-run: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run main.go
-
-build: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -a -o skyd .
+fmt:
+	go fmt ./...
 
 get:
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) get .
 
-.PHONY: test
+grammar:
+	${MAKE} -C query/parser
+
+run: grammar
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run main.go
+
+test: grammar
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) $(PKG)
+
+.PHONY: default bench build cover env fmt get grammar run test
