@@ -48,6 +48,8 @@ func (s *Server) queryHandler(w http.ResponseWriter, req *http.Request, params m
 		return nil, err
 	}
 
+	q.Prefix = req.FormValue("prefix")
+
 	q, err := s.parseQuery(table, params)
 	if err != nil {
 		return nil, err
@@ -108,11 +110,6 @@ func (s *Server) parseQuery(table *core.Table, params map[string]interface{}) (*
 		if err = q.Deserialize(obj); err != nil {
 			return nil, err
 		}
-	}
-
-	// Use prefix from request parameter, if it exists.
-	if prefix, ok := params["prefix"].(string); ok {
-		q.Prefix = prefix
 	}
 
 	q.SetTable(table)
