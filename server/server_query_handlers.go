@@ -119,6 +119,12 @@ func (s *Server) parseQuery(table *core.Table, params map[string]interface{}) (*
 			return nil, err
 		}
 	}
+
+	// Use prefix from request parameter, if it exists.
+	if prefix, ok := params["prefix"].(string); ok {
+		q.Prefix = prefix
+	}
+
 	q.SetTable(table)
 	q.SetFactorizer(f)
 
