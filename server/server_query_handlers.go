@@ -48,12 +48,12 @@ func (s *Server) queryHandler(w http.ResponseWriter, req *http.Request, params m
 		return nil, err
 	}
 
-	q.Prefix = req.FormValue("prefix")
-
 	q, err := s.parseQuery(table, params)
 	if err != nil {
 		return nil, err
 	}
+
+	q.Prefix = req.FormValue("prefix")
 
 	return s.RunQuery(table, q)
 }
