@@ -47,7 +47,7 @@ func (h *eventHandler) getEvents(s *Server, req Request) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := f.DefactorizeEvent(event, t.PropertyFile()); err != nil {
+		if err := f.DefactorizeEvent(event, t.Properties()); err != nil {
 			return nil, err
 		}
 	}
@@ -84,7 +84,7 @@ func (h *eventHandler) getEvent(s *Server, req Request) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := f.DefactorizeEvent(event, t.PropertyFile()); err != nil {
+	if err := f.DefactorizeEvent(event, t.Properties()); err != nil {
 		return nil, err
 	}
 	return t.SerializeEvent(event)
@@ -105,7 +105,7 @@ func (h *eventHandler) insertEvent(s *Server, req Request) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	if err = f.FactorizeEvent(event, t.PropertyFile(), true); err != nil {
+	if err = f.FactorizeEvent(event, t.Properties(), true); err != nil {
 		return nil, err
 	}
 	return nil, s.db.InsertEvent(t.Name, req.Var("id"), event)
@@ -191,7 +191,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 			if err != nil {
 				return err
 			}
-			if err := f.FactorizeEvent(event, eventTable.PropertyFile(), true); err != nil {
+			if err := f.FactorizeEvent(event, eventTable.Properties(), true); err != nil {
 				return fmt.Errorf("Cannot factorize: %v", err)
 			}
 

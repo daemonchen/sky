@@ -36,16 +36,10 @@ func (h *propertyHandler) getProperty(s *Server, req Request) (interface{}, erro
 // updateProperty updates a property on a table.
 func (h *propertyHandler) updateProperty(s *Server, req Request) (interface{}, error) {
 	data := req.Data().(map[string]interface{})
-	p := req.Property()
-	p.Name = data["name"].(string)
-	if err := req.Table().SavePropertyFile(); err != nil {
-		return nil, err
-	}
-	return p, nil
+	return req.Table().RenameProperty(req.Property().Name, data["name"].(string))
 }
 
 // deleteProperty removes a property from a table.
 func (h *propertyHandler) deleteProperty(s *Server, req Request) (interface{}, error) {
-	req.Table().DeleteProperty(req.Property())
-	return nil, req.Table().SavePropertyFile()
+	return nil, req.Table().DeleteProperty(req.Property())
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"sort"
@@ -35,7 +34,7 @@ func (h *tableHandler) getTables(s *Server, req Request) (interface{}, error) {
 	tables := []*core.Table{}
 	for _, info := range infos {
 		if info.IsDir() {
-			tables = append(tables, core.NewTable(info.Name(), s.TablePath(info.Name())))
+			tables = append(tables, &core.Table{Name: info.Name()})
 		}
 	}
 
@@ -51,15 +50,12 @@ func (h *tableHandler) getTable(s *Server, req Request) (interface{}, error) {
 func (h *tableHandler) createTable(s *Server, req Request) (interface{}, error) {
 	data := req.Data().(map[string]interface{})
 	name, _ := data["name"].(string)
-	if name == "" {
-		return nil, errors.New("server: table name required")
-	}
 	if table, _ := s.OpenTable(name); table != nil {
 		return nil, fmt.Errorf("server: table already exists: %s", name)
 	}
 
-	t := core.NewTable(name, s.TablePath(name))
-	if err := t.Create(); err != nil {
+	t := &core.Table{Name: name}
+	if err := t.Create(s.TablePath(name)); err != nil {
 		return nil, err
 	}
 	return t, nil

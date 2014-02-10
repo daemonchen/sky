@@ -138,7 +138,7 @@ func (f *Factorizer) Defactorize(id string, value uint64) (string, error) {
 }
 
 // FactorizeEvent converts all the values of an event into their numeric identifiers.
-func (f *Factorizer) FactorizeEvent(event *core.Event, propertyFile *core.PropertyFile, createIfMissing bool) error {
+func (f *Factorizer) FactorizeEvent(event *core.Event, properties core.Properties, createIfMissing bool) error {
 	if event == nil {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (f *Factorizer) FactorizeEvent(event *core.Event, propertyFile *core.Proper
 	defer f.renew()
 
 	for k, v := range event.Data {
-		property := propertyFile.GetProperty(k)
+		property := properties.FindById(k)
 		if property.DataType == core.FactorDataType {
 			if stringValue, ok := v.(string); ok {
 				sequence, err := f.factorize(property.Name, stringValue, createIfMissing)
@@ -164,7 +164,7 @@ func (f *Factorizer) FactorizeEvent(event *core.Event, propertyFile *core.Proper
 }
 
 // DefactorizeEvent converts all the values of an event from their numeric identifiers to their string values.
-func (f *Factorizer) DefactorizeEvent(event *core.Event, propertyFile *core.PropertyFile) error {
+func (f *Factorizer) DefactorizeEvent(event *core.Event, properties core.Properties) error {
 	if event == nil {
 		return nil
 	}
@@ -174,7 +174,7 @@ func (f *Factorizer) DefactorizeEvent(event *core.Event, propertyFile *core.Prop
 	defer f.renew()
 
 	for k, v := range event.Data {
-		property := propertyFile.GetProperty(k)
+		property := properties.FindById(k)
 		if property.DataType == core.FactorDataType {
 			var sequence uint64
 			switch v := v.(type) {

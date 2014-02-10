@@ -200,9 +200,8 @@ func (s *Server) OpenTable(name string) (*core.Table, error) {
 	}
 
 	// Otherwise open it and save the reference.
-	table = core.NewTable(name, s.TablePath(name))
-	err := table.Open()
-	if err != nil {
+	table = &core.Table{Name: name}
+	if err := table.Open(s.TablePath(name)); err != nil {
 		table.Close()
 		return nil, err
 	}
