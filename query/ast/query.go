@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 )
 
 // Query represents a collection of statements used to process data in
@@ -28,9 +28,9 @@ func (q *Query) block() {}
 func NewQuery() *Query {
 	q := &Query{}
 	q.SystemVarDecls = VarDecls{
-		NewVarDecl(0, "@eof", core.BooleanDataType),
-		NewVarDecl(0, "@eos", core.BooleanDataType),
-		NewVarDecl(0, "@timestamp", core.IntegerDataType),
+		NewVarDecl(0, "@eof", db.BooleanDataType),
+		NewVarDecl(0, "@eos", db.BooleanDataType),
+		NewVarDecl(0, "@timestamp", db.IntegerDataType),
 	}
 	return q
 }

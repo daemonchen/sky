@@ -1,7 +1,7 @@
 package validator
 
 import (
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
 
@@ -30,7 +30,7 @@ func (v *validator) exitingSelection(n *ast.Selection, tbl *ast.Symtable) {
 	for _, dimension := range n.Dimensions {
 		decl := tbl.Find(dimension.Name)
 		switch decl.DataType {
-		case core.StringDataType, core.FloatDataType:
+		case db.StringDataType, db.FloatDataType:
 			v.err = errorf(n, "selection: %s variables cannot be used as dimensions: %s", decl.DataType, dimension.Name)
 			return
 		}

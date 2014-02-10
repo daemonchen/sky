@@ -5,7 +5,7 @@ import __yyfmt__ "fmt"
 
 //line grammar.y:3
 import (
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
 
@@ -165,6 +165,7 @@ const yyErrCode = 2
 const yyMaxDepth = 200
 
 //line grammar.y:452
+
 type within struct {
 	start int
 	end   int
@@ -653,27 +654,27 @@ yydefault:
 	case 21:
 		//line grammar.y:184
 		{
-			yyVAL.str = core.FactorDataType
+			yyVAL.str = db.FactorDataType
 		}
 	case 22:
 		//line grammar.y:185
 		{
-			yyVAL.str = core.StringDataType
+			yyVAL.str = db.StringDataType
 		}
 	case 23:
 		//line grammar.y:186
 		{
-			yyVAL.str = core.IntegerDataType
+			yyVAL.str = db.IntegerDataType
 		}
 	case 24:
 		//line grammar.y:187
 		{
-			yyVAL.str = core.FloatDataType
+			yyVAL.str = db.FloatDataType
 		}
 	case 25:
 		//line grammar.y:188
 		{
-			yyVAL.str = core.BooleanDataType
+			yyVAL.str = db.BooleanDataType
 		}
 	case 26:
 		//line grammar.y:193

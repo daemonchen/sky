@@ -1,7 +1,7 @@
 package validator
 
 import (
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
 
@@ -38,7 +38,7 @@ func (v *validator) exitingField(n *ast.Field, tbl *ast.Symtable) {
 		expressionType := v.dataTypes[n.Expression]
 
 		switch expressionType {
-		case core.IntegerDataType, core.FloatDataType:
+		case db.IntegerDataType, db.FloatDataType:
 		default:
 			v.err = errorf(n, "field: invalid expression data type: %s", expressionType)
 		}

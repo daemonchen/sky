@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/skydb/sky/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/szferi/gomdb"
 )
@@ -33,7 +32,7 @@ func TestDBInsertEvent(t *testing.T) {
 
 func TestDBInsertEvents(t *testing.T) {
 	withDB(0, func(db *db) {
-		input := []*core.Event{
+		input := []*Event{
 			testevent("2000-01-01T00:00:02Z", 2, 100),
 			testevent("2000-01-01T00:00:00Z", 1, "john"),
 		}
@@ -50,12 +49,12 @@ func TestDBInsertEvents(t *testing.T) {
 
 func TestDBInsertObjects(t *testing.T) {
 	withDB(0, func(db *db) {
-		input := map[string][]*core.Event{
-			"bar": []*core.Event{
+		input := map[string][]*Event{
+			"bar": []*Event{
 				testevent("2000-01-01T00:00:02Z", 2, 100),
 				testevent("2000-01-01T00:00:00Z", 1, "john"),
 			},
-			"bat": []*core.Event{
+			"bat": []*Event{
 				testevent("2000-01-01T00:00:00Z", 1, "jose"),
 			},
 		}
@@ -229,8 +228,8 @@ func withDB(shardCount int, f func(db *db)) {
 	f(db)
 }
 
-func testevent(timestamp string, args ...interface{}) *core.Event {
-	e := &core.Event{Timestamp: musttime(timestamp)}
+func testevent(timestamp string, args ...interface{}) *Event {
+	e := &Event{Timestamp: musttime(timestamp)}
 	e.Data = make(map[int64]interface{})
 	for i := 0; i < len(args); i += 2 {
 		key := args[i].(int)

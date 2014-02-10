@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"sort"
 
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/szferi/gomdb"
 )
 
@@ -31,10 +31,10 @@ func (h *tableHandler) getTables(s *Server, req Request) (interface{}, error) {
 		return nil, err
 	}
 
-	tables := []*core.Table{}
+	tables := []*db.Table{}
 	for _, info := range infos {
 		if info.IsDir() {
-			tables = append(tables, &core.Table{Name: info.Name()})
+			tables = append(tables, &db.Table{Name: info.Name()})
 		}
 	}
 
@@ -54,7 +54,7 @@ func (h *tableHandler) createTable(s *Server, req Request) (interface{}, error) 
 		return nil, fmt.Errorf("server: table already exists: %s", name)
 	}
 
-	t := &core.Table{Name: name}
+	t := &db.Table{Name: name}
 	if err := t.Create(s.TablePath(name)); err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (h *tableHandler) deleteTable(s *Server, req Request) (interface{}, error) 
 		return nil, err
 	}
 
-	// Remove the table from the lookup and remove it's core.
+	// Remove the table from the lookup and remove it.
 	s.Lock()
 	delete(s.tables, t.Name)
 	defer s.Unlock()

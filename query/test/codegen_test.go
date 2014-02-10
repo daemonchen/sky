@@ -9,12 +9,12 @@ func TestSelectCount(t *testing.T) {
 	`
 	result, err := run(query, ast.VarDecls{
 		ast.NewVarDecl(1, "foo", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 10),
 			testevent("2000-01-01T00:00:02Z", 1, 20),
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 40),
 		},
 	})

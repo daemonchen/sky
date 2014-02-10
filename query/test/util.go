@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/skydb/sky/core"
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/codegen/hashmap"
@@ -16,8 +15,8 @@ import (
 	"github.com/skydb/sky/query/parser"
 )
 
-func testevent(timestamp string, args ...interface{}) *core.Event {
-	e := &core.Event{Timestamp: musttime(timestamp)}
+func testevent(timestamp string, args ...interface{}) *db.Event {
+	e := &db.Event{Timestamp: musttime(timestamp)}
 	e.Data = make(map[int64]interface{})
 	for i := 0; i < len(args); i += 2 {
 		key := args[i].(int)
@@ -51,7 +50,7 @@ func debugln(a ...interface{}) (n int, err error) {
 }
 
 // Executes a query against a multiple shards and return the results.
-func withDB(objects map[string][]*core.Event, shardCount int, fn func(db.DB) error) error {
+func withDB(objects map[string][]*db.Event, shardCount int, fn func(db.DB) error) error {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
@@ -74,7 +73,7 @@ func withDB(objects map[string][]*core.Event, shardCount int, fn func(db.DB) err
 }
 
 // Executes a query against a given set of data and return the results.
-func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*core.Event) (*hashmap.Hashmap, error) {
+func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
 	var h *hashmap.Hashmap
 	err := runDBMappers(1, query, decls, objects, func(db db.DB, results []*hashmap.Hashmap) error {
 		if len(results) > 0 {
@@ -86,7 +85,7 @@ func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*core.Ev
 }
 
 // Executes a query against a multiple shards and return the results.
-func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[string][]*core.Event, fn func(db.DB, []*hashmap.Hashmap) error) error {
+func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[string][]*db.Event, fn func(db.DB, []*hashmap.Hashmap) error) error {
 	err := withDB(objects, shardCount, func(db db.DB) error {
 		// Retrieve cursors.
 		cursors, err := db.Cursors("TBL")
@@ -137,7 +136,7 @@ func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[
 }
 
 // Executes a query against a given set of data, reduces it and return the reduced results.
-func runDBMapReducer(shardCount int, query string, decls ast.VarDecls, objects map[string][]*core.Event) (map[string]interface{}, error) {
+func runDBMapReducer(shardCount int, query string, decls ast.VarDecls, objects map[string][]*db.Event) (map[string]interface{}, error) {
 	var output map[string]interface{}
 
 	// Create a query.

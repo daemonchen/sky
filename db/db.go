@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/skydb/sky/core"
 	"github.com/skydb/sky/hash"
 )
 
@@ -20,11 +19,11 @@ type DB interface {
 	Close()
 	Factorizer(tablespace string) (*Factorizer, error)
 	Cursors(tablespace string) (Cursors, error)
-	GetEvent(tablespace string, id string, timestamp time.Time) (*core.Event, error)
-	GetEvents(tablespace string, id string) ([]*core.Event, error)
-	InsertEvent(tablespace string, id string, event *core.Event) error
-	InsertEvents(tablespace string, id string, newEvents []*core.Event) error
-	InsertObjects(tablespace string, objects map[string][]*core.Event) (int, error)
+	GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error)
+	GetEvents(tablespace string, id string) ([]*Event, error)
+	InsertEvent(tablespace string, id string, event *Event) error
+	InsertEvents(tablespace string, id string, newEvents []*Event) error
+	InsertObjects(tablespace string, objects map[string][]*Event) (int, error)
 	DeleteEvent(tablespace string, id string, timestamp time.Time) error
 	DeleteObject(tablespace string, id string) error
 	Merge(tablespace string, destinationId string, sourceId string) error
@@ -216,30 +215,30 @@ func (db *db) Cursors(tablespace string) (Cursors, error) {
 	return cursors, nil
 }
 
-func (db *db) GetEvent(tablespace string, id string, timestamp time.Time) (*core.Event, error) {
+func (db *db) GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error) {
 	s := db.getShardByObjectId(id)
 	return s.GetEvent(tablespace, id, timestamp)
 }
 
-func (db *db) GetEvents(tablespace string, id string) ([]*core.Event, error) {
+func (db *db) GetEvents(tablespace string, id string) ([]*Event, error) {
 	s := db.getShardByObjectId(id)
 	return s.GetEvents(tablespace, id)
 }
 
 // InsertEvent adds a single event to the database.
-func (db *db) InsertEvent(tablespace string, id string, event *core.Event) error {
+func (db *db) InsertEvent(tablespace string, id string, event *Event) error {
 	s := db.getShardByObjectId(id)
 	return s.InsertEvent(tablespace, id, event)
 }
 
 // InsertEvents adds multiple events for a single object.
-func (db *db) InsertEvents(tablespace string, id string, newEvents []*core.Event) error {
+func (db *db) InsertEvents(tablespace string, id string, newEvents []*Event) error {
 	s := db.getShardByObjectId(id)
 	return s.InsertEvents(tablespace, id, newEvents)
 }
 
 // InsertObjects bulk inserts events for multiple objects.
-func (db *db) InsertObjects(tablespace string, objects map[string][]*core.Event) (int, error) {
+func (db *db) InsertObjects(tablespace string, objects map[string][]*Event) (int, error) {
 	count := 0
 	for id, events := range objects {
 		s := db.getShardByObjectId(id)

@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/skydb/sky/core"
 	"github.com/szferi/gomdb"
 	"os"
 	"sync"
@@ -138,7 +137,7 @@ func (f *Factorizer) Defactorize(id string, value uint64) (string, error) {
 }
 
 // FactorizeEvent converts all the values of an event into their numeric identifiers.
-func (f *Factorizer) FactorizeEvent(event *core.Event, properties core.Properties, createIfMissing bool) error {
+func (f *Factorizer) FactorizeEvent(event *Event, properties Properties, createIfMissing bool) error {
 	if event == nil {
 		return nil
 	}
@@ -149,7 +148,7 @@ func (f *Factorizer) FactorizeEvent(event *core.Event, properties core.Propertie
 
 	for k, v := range event.Data {
 		property := properties.FindById(k)
-		if property.DataType == core.FactorDataType {
+		if property.DataType == FactorDataType {
 			if stringValue, ok := v.(string); ok {
 				sequence, err := f.factorize(property.Name, stringValue, createIfMissing)
 				if err != nil {
@@ -164,7 +163,7 @@ func (f *Factorizer) FactorizeEvent(event *core.Event, properties core.Propertie
 }
 
 // DefactorizeEvent converts all the values of an event from their numeric identifiers to their string values.
-func (f *Factorizer) DefactorizeEvent(event *core.Event, properties core.Properties) error {
+func (f *Factorizer) DefactorizeEvent(event *Event, properties Properties) error {
 	if event == nil {
 		return nil
 	}
@@ -175,7 +174,7 @@ func (f *Factorizer) DefactorizeEvent(event *core.Event, properties core.Propert
 
 	for k, v := range event.Data {
 		property := properties.FindById(k)
-		if property.DataType == core.FactorDataType {
+		if property.DataType == FactorDataType {
 			var sequence uint64
 			switch v := v.(type) {
 			case int8:

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/axw/gollvm/llvm"
-	"github.com/skydb/sky/core"
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
@@ -32,16 +31,16 @@ func (m *Mapper) codegenEventType() llvm.Type {
 		var field llvm.Type
 
 		switch decl.DataType {
-		case core.StringDataType:
+		case db.StringDataType:
 			field = m.context.StructType([]llvm.Type{
 				m.context.Int64Type(),
 				llvm.PointerType(m.context.VoidType(), 0),
 			}, false)
-		case core.IntegerDataType, core.FactorDataType:
+		case db.IntegerDataType, db.FactorDataType:
 			field = m.context.Int64Type()
-		case core.FloatDataType:
+		case db.FloatDataType:
 			field = m.context.DoubleType()
-		case core.BooleanDataType:
+		case db.BooleanDataType:
 			field = m.context.Int64Type()
 		}
 
@@ -223,7 +222,7 @@ func (m *Mapper) codegenEventCopyFunc(functionName string, filter func(*ast.VarD
 	for _, decl := range m.decls {
 		if filter == nil || filter(decl) {
 			switch decl.DataType {
-			case core.IntegerDataType, core.FactorDataType, core.FloatDataType, core.BooleanDataType:
+			case db.IntegerDataType, db.FactorDataType, db.FloatDataType, db.BooleanDataType:
 				m.store(m.load(m.structgep(m.load(src, ""), decl.Index())), m.structgep(m.load(dest, ""), decl.Index()))
 			}
 		}
@@ -251,11 +250,11 @@ func (m *Mapper) codegenEventResetFunc(functionName string, filter func(*ast.Var
 	for index, decl := range m.decls {
 		if filter == nil || filter(decl) {
 			switch decl.DataType {
-			case core.StringDataType:
+			case db.StringDataType:
 				panic("NOT YET IMPLEMENTED: clear_event [string]")
-			case core.IntegerDataType, core.FactorDataType, core.BooleanDataType:
+			case db.IntegerDataType, db.FactorDataType, db.BooleanDataType:
 				m.store(m.constint(0), m.structgep(m.load(event), index, decl.Name))
-			case core.FloatDataType:
+			case db.FloatDataType:
 				m.store(m.constfloat(0), m.structgep(m.load(event), index, decl.Name))
 			}
 		}
@@ -367,17 +366,17 @@ func (m *Mapper) codegenReadEventFunc() llvm.Value {
 	for i, decl := range read_decls {
 		m.builder.SetInsertPointAtEnd(read_labels[i])
 
-		if decl.DataType == core.StringDataType {
+		if decl.DataType == db.StringDataType {
 			panic("NOT YET IMPLEMENTED: read_event [string]")
 		}
 
 		var minipack_func_name string
 		switch decl.DataType {
-		case core.IntegerDataType, core.FactorDataType:
+		case db.IntegerDataType, db.FactorDataType:
 			minipack_func_name = "minipack_unpack_int"
-		case core.FloatDataType:
+		case db.FloatDataType:
 			minipack_func_name = "minipack_unpack_double"
-		case core.BooleanDataType:
+		case db.BooleanDataType:
 			minipack_func_name = "minipack_unpack_bool"
 		}
 

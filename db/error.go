@@ -1,4 +1,4 @@
-package core
+package db
 
 type Error struct {
 	message string

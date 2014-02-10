@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 )
 
 // eventHandler handles the management of events in the database.
@@ -16,7 +16,7 @@ type eventHandler struct {
 	s *Server
 }
 
-type objectEvents map[string][]*core.Event
+type objectEvents map[string][]*db.Event
 
 // installEventHandler adds table routes to the server.
 func installEventHandler(s *Server) *eventHandler {
@@ -76,7 +76,7 @@ func (h *eventHandler) getEvent(s *Server, req Request) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		event = &core.Event{Timestamp: t, Data: make(map[int64]interface{})}
+		event = &db.Event{Timestamp: t, Data: make(map[int64]interface{})}
 	}
 
 	// Convert an event to a serializable object.
@@ -128,7 +128,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 	vars := mux.Vars(req)
 	t0 := time.Now()
 
-	var table *core.Table
+	var table *db.Table
 	tableName := vars["table"]
 	if tableName != "" {
 		var err error
@@ -141,7 +141,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	tableObjects := make(map[*core.Table]objectEvents)
+	tableObjects := make(map[*db.Table]objectEvents)
 
 	events_written := 0
 	err := func() error {
@@ -157,7 +157,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 			}
 
 			// Extract table name, if necessary.
-			var eventTable *core.Table
+			var eventTable *db.Table
 			if table == nil {
 				tableName, ok := rawEvent["table"].(string)
 				if !ok {

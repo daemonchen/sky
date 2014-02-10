@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/skydb/sky/core"
 	"github.com/szferi/gomdb"
 	"github.com/ugorji/go/codec"
 )
@@ -150,7 +149,7 @@ func (s *shard) cursor(txn *mdb.Txn, dbi mdb.DBI) (*mdb.Cursor, error) {
 }
 
 // InsertEvent adds a single event to the shard.
-func (s *shard) InsertEvent(tablespace string, id string, event *core.Event) error {
+func (s *shard) InsertEvent(tablespace string, id string, event *Event) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -209,7 +208,7 @@ func (s *shard) insertEvent(txn *mdb.Txn, dbi mdb.DBI, c *mdb.Cursor, id string,
 }
 
 // InsertEvents adds a multiple events for an object to the shard.
-func (s *shard) InsertEvents(tablespace string, id string, events []*core.Event) error {
+func (s *shard) InsertEvents(tablespace string, id string, events []*Event) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -235,7 +234,7 @@ func (s *shard) InsertEvents(tablespace string, id string, events []*core.Event)
 }
 
 // Retrieves an event for a given object at a single point in time.
-func (s *shard) GetEvent(tablespace string, id string, timestamp time.Time) (*core.Event, error) {
+func (s *shard) GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -260,7 +259,7 @@ func (s *shard) GetEvent(tablespace string, id string, timestamp time.Time) (*co
 		return nil, nil
 	}
 
-	return &core.Event{Timestamp: timestamp, Data: data}, nil
+	return &Event{Timestamp: timestamp, Data: data}, nil
 }
 
 func (s *shard) getEvent(c *mdb.Cursor, id string, timestamp []byte) (map[int64]interface{}, error) {
@@ -300,11 +299,11 @@ func (s *shard) getEvent(c *mdb.Cursor, id string, timestamp []byte) (map[int64]
 }
 
 // Retrieves a list of events for a given object in a table.
-func (s *shard) GetEvents(tablespace string, id string) ([]*core.Event, error) {
+func (s *shard) GetEvents(tablespace string, id string) ([]*Event, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	var events = make([]*core.Event, 0)
+	var events = make([]*Event, 0)
 
 	txn, dbi, err := s.txn(tablespace, true)
 	if err != nil {
@@ -332,7 +331,7 @@ func (s *shard) GetEvents(tablespace string, id string) ([]*core.Event, error) {
 		}
 
 		// Create event.
-		event := &core.Event{
+		event := &Event{
 			Timestamp: unshiftTimeBytes(val[0:8]),
 			Data:      make(map[int64]interface{}),
 		}

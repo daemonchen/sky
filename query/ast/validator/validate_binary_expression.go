@@ -1,7 +1,7 @@
 package validator
 
 import (
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
 
@@ -17,11 +17,11 @@ func (v *validator) exitingBinaryExpression(n *ast.BinaryExpression, tbl *ast.Sy
 	}
 
 	switch lhsType {
-	case core.BooleanDataType:
+	case db.BooleanDataType:
 		v.exitingBooleanBinaryExpression(n, tbl)
-	case core.FactorDataType:
+	case db.FactorDataType:
 		v.exitingFactorBinaryExpression(n, tbl)
-	case core.IntegerDataType, core.FloatDataType:
+	case db.IntegerDataType, db.FloatDataType:
 		v.exitingNumericBinaryExpression(n, tbl)
 	default:
 		v.err = errorf(n, "expression: invalid binary expression type: %s", lhsType)
@@ -31,7 +31,7 @@ func (v *validator) exitingBinaryExpression(n *ast.BinaryExpression, tbl *ast.Sy
 func (v *validator) exitingBooleanBinaryExpression(n *ast.BinaryExpression, tbl *ast.Symtable) {
 	switch n.Op {
 	case ast.OpEquals, ast.OpNotEquals, ast.OpAnd, ast.OpOr:
-		v.dataTypes[n] = core.BooleanDataType
+		v.dataTypes[n] = db.BooleanDataType
 	default:
 		v.err = errorf(n, "expression: invalid boolean operator: %s", n.OpString())
 	}
@@ -61,7 +61,7 @@ func (v *validator) exitingFactorBinaryExpression(n *ast.BinaryExpression, tbl *
 
 	switch n.Op {
 	case ast.OpEquals, ast.OpNotEquals:
-		v.dataTypes[n] = core.BooleanDataType
+		v.dataTypes[n] = db.BooleanDataType
 	default:
 		v.err = errorf(n, "expression: invalid factor operator: %s", n.OpString())
 	}
@@ -70,15 +70,15 @@ func (v *validator) exitingFactorBinaryExpression(n *ast.BinaryExpression, tbl *
 func (v *validator) exitingNumericBinaryExpression(n *ast.BinaryExpression, tbl *ast.Symtable) {
 	switch n.Op {
 	case ast.OpEquals, ast.OpNotEquals:
-		v.dataTypes[n] = core.BooleanDataType
+		v.dataTypes[n] = db.BooleanDataType
 	case ast.OpGreaterThan, ast.OpGreaterThanOrEqualTo:
-		v.dataTypes[n] = core.BooleanDataType
+		v.dataTypes[n] = db.BooleanDataType
 	case ast.OpLessThan, ast.OpLessThanOrEqualTo:
-		v.dataTypes[n] = core.BooleanDataType
+		v.dataTypes[n] = db.BooleanDataType
 	case ast.OpPlus, ast.OpMinus:
-		v.dataTypes[n] = core.IntegerDataType
+		v.dataTypes[n] = db.IntegerDataType
 	case ast.OpMultiply, ast.OpDivide:
-		v.dataTypes[n] = core.IntegerDataType
+		v.dataTypes[n] = db.IntegerDataType
 	default:
 		v.err = errorf(n, "expression: invalid numeric operator: %s", n.OpString())
 	}

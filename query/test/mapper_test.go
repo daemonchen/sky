@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/codegen/hashmap"
 	"github.com/stretchr/testify/assert"
@@ -26,12 +26,12 @@ func TestMapperSelectCount(t *testing.T) {
 	`
 	result, err := runDBMapper(query, ast.VarDecls{
 		ast.NewVarDecl(1, "foo", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 10),
 			testevent("2000-01-01T00:00:02Z", 1, 20),
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 40),
 		},
 	})
@@ -49,12 +49,12 @@ func TestMapperSelectInto(t *testing.T) {
 	`
 	result, err := runDBMapper(query, ast.VarDecls{
 		ast.NewVarDecl(1, "foo", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 10),
 			testevent("2000-01-01T00:00:02Z", 1, 20),
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 40),
 		},
 	})
@@ -74,12 +74,12 @@ func TestMapperCondition(t *testing.T) {
 	`
 	result, err := runDBMapper(query, ast.VarDecls{
 		ast.NewVarDecl(1, "foo", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 10),
 			testevent("2000-01-01T00:00:02Z", 1, 20),
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 40),
 		},
 	})
@@ -99,12 +99,12 @@ func TestMapperFactorEquality(t *testing.T) {
 	`
 	result, err := runDBMapper(query, ast.VarDecls{
 		ast.NewVarDecl(2, "factorVariable", "factor"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 2, 1), // "XXX"
 			testevent("2000-01-01T00:00:02Z", 2, 2), // "YYY"
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 2, 1), // "XXX"
 		},
 	})
@@ -124,12 +124,12 @@ func TestMapperAssignment(t *testing.T) {
 	`
 	result, err := runDBMapper(query, ast.VarDecls{
 		ast.NewVarDecl(2, "integerVariable", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 2, 1), // myVar=1, sum=1
 			testevent("2000-01-01T00:00:02Z", 2, 2), // myVar=2, sum=3
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 2, 3), // myVar=1, sum=4
 		},
 	})
@@ -150,15 +150,15 @@ func TestMapperSessionLoop(t *testing.T) {
 	`
 	result, err := runDBMapper(query, ast.VarDecls{
 		ast.NewVarDecl(1, "action", "factor"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("1970-01-01T00:00:01Z", 1, 1), // ts=1,     action=A0
 			testevent("1970-01-01T01:59:59Z", 1, 2), // ts=7199,  action=A1
 			testevent("1970-01-02T00:00:00Z", 1, 1), // ts=86400, action=A0
 			testevent("1970-01-02T02:00:00Z", 1, 2), // ts=93600, action=A1
 		},
 
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("1970-01-02T02:00:00Z", 1, 1), // action=A0
 		},
 	})

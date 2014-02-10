@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
-	"github.com/skydb/sky/core"
 	"github.com/skydb/sky/db"
 )
 
@@ -28,7 +27,7 @@ type Server struct {
 	db               db.DB
 	path             string
 	listener         net.Listener
-	tables           map[string]*core.Table
+	tables           map[string]*db.Table
 	shutdownChannel  chan bool
 	shutdownFinished chan bool
 	NoSync           bool
@@ -44,7 +43,7 @@ func NewServer(port uint, path string) *Server {
 		Router:     mux.NewRouter(),
 		logger:     log.New(os.Stdout, "", log.LstdFlags),
 		path:       path,
-		tables:     make(map[string]*core.Table),
+		tables:     make(map[string]*db.Table),
 		NoSync:     false,
 		MaxDBs:     4096,
 		MaxReaders: 126,
@@ -185,14 +184,14 @@ func (s *Server) Silence() {
 }
 
 // Retrieves a table that has already been opened.
-func (s *Server) GetTable(name string) *core.Table {
+func (s *Server) GetTable(name string) *db.Table {
 	s.Lock()
 	defer s.Unlock()
 	return s.tables[name]
 }
 
 // Opens a table and returns a reference to it.
-func (s *Server) OpenTable(name string) (*core.Table, error) {
+func (s *Server) OpenTable(name string) (*db.Table, error) {
 	// If table already exists then use it.
 	table := s.GetTable(name)
 	if table != nil {
@@ -200,7 +199,7 @@ func (s *Server) OpenTable(name string) (*core.Table, error) {
 	}
 
 	// Otherwise open it and save the reference.
-	table = &core.Table{Name: name}
+	table = &db.Table{Name: name}
 	if err := table.Open(s.TablePath(name)); err != nil {
 		table.Close()
 		return nil, err

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/codegen/hashmap"
 )
@@ -54,13 +54,13 @@ func (r *Reducer) reduceSelectionDimensions(node *ast.Selection, h *hashmap.Hash
 		// Convert value to appropriate type based on variable decl.
 		var keyString string
 		switch decl.DataType {
-		case core.StringDataType:
+		case db.StringDataType:
 			return fmt.Errorf("reduce: string dimensions are not supported: %s", dimension.Name)
-		case core.FloatDataType:
+		case db.FloatDataType:
 			return fmt.Errorf("reduce: float dimensions are not supported: %s", dimension.Name)
-		case core.IntegerDataType:
+		case db.IntegerDataType:
 			keyString = strconv.Itoa(int(key))
-		case core.FactorDataType:
+		case db.FactorDataType:
 			var err error
 			decl := tbl.Find(dimension.Name)
 			name := decl.Association
@@ -70,7 +70,7 @@ func (r *Reducer) reduceSelectionDimensions(node *ast.Selection, h *hashmap.Hash
 			if keyString, err = r.factorizer.Defactorize(name, uint64(key)); err != nil {
 				return fmt.Errorf("reduce: factor not found: %s/%d", name, uint64(key))
 			}
-		case core.BooleanDataType:
+		case db.BooleanDataType:
 			if key == 0 {
 				keyString = "false"
 			} else {

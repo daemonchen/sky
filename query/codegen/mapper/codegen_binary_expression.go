@@ -3,7 +3,6 @@ package mapper
 import (
 	"fmt"
 	"github.com/axw/gollvm/llvm"
-	"github.com/skydb/sky/core"
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 )
@@ -107,7 +106,7 @@ func (m *Mapper) isFactorVarRef(node ast.Expression, tbl *ast.Symtable) bool {
 		return false
 	}
 	decl := tbl.Find(ref.Name)
-	return (decl != nil && decl.DataType == core.FactorDataType)
+	return (decl != nil && decl.DataType == db.FactorDataType)
 }
 
 func (m *Mapper) promoteOperands(lhs, rhs llvm.Value) (llvm.Value, llvm.Value, bool) {

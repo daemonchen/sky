@@ -3,7 +3,7 @@
 package parser
 
 import (
-    "github.com/skydb/sky/core"
+    "github.com/skydb/sky/db"
     "github.com/skydb/sky/query/ast"
 )
 
@@ -181,11 +181,11 @@ var_decl_association :
 ;
 
 data_type :
-    TFACTOR  { $$ = core.FactorDataType }
-|   TSTRING  { $$ = core.StringDataType }
-|   TINTEGER { $$ = core.IntegerDataType }
-|   TFLOAT   { $$ = core.FloatDataType }
-|   TBOOLEAN { $$ = core.BooleanDataType }
+    TFACTOR  { $$ = db.FactorDataType }
+|   TSTRING  { $$ = db.StringDataType }
+|   TINTEGER { $$ = db.IntegerDataType }
+|   TFLOAT   { $$ = db.FloatDataType }
+|   TBOOLEAN { $$ = db.BooleanDataType }
 ;
 
 assignment :

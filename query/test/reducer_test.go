@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,12 +16,12 @@ func TestReducerSelectCount(t *testing.T) {
 	`
 	result, err := runDBMapReducer(1, query, ast.VarDecls{
 		ast.NewVarDecl(8, "foo", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 10),
 			testevent("2000-01-01T00:00:02Z", 1, 20),
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 40),
 		},
 	})
@@ -39,13 +39,13 @@ func TestReducerSelectGroupBy(t *testing.T) {
 		ast.NewVarDecl(1, "action", "factor"),
 		ast.NewVarDecl(2, "booleanValue", "boolean"),
 		ast.NewVarDecl(3, "integerValue", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 1, 2, true, 3, 10),   // A0/true/10
 			testevent("2000-01-01T00:00:01Z", 1, 1, 2, false, 3, 20),  // A0/false/20
 			testevent("2000-01-01T00:00:02Z", 1, 2, 2, false, 3, 100), // A1/false/100
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 1, 2, true, 3, 40), // A0/true/40
 		},
 	})
@@ -61,12 +61,12 @@ func TestReducerSelectInto(t *testing.T) {
 	`
 	result, err := runDBMapReducer(1, query, ast.VarDecls{
 		ast.NewVarDecl(8, "foo", "integer"),
-	}, map[string][]*core.Event{
-		"foo": []*core.Event{
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 10),
 			testevent("2000-01-01T00:00:02Z", 1, 20),
 		},
-		"bar": []*core.Event{
+		"bar": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", 1, 40),
 		},
 	})

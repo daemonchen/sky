@@ -2,7 +2,7 @@ package ast
 
 import (
 	"fmt"
-	"github.com/skydb/sky/core"
+	"github.com/skydb/sky/db"
 )
 
 // VarDecl represents a variable declaration in the query. The value
@@ -55,15 +55,15 @@ func (v *VarDecl) IsDeclared() bool {
 func (v *VarDecl) String() string {
 	var dataType string
 	switch v.DataType {
-	case core.FactorDataType:
+	case db.FactorDataType:
 		dataType = "FACTOR"
-	case core.StringDataType:
+	case db.StringDataType:
 		dataType = "STRING"
-	case core.IntegerDataType:
+	case db.IntegerDataType:
 		dataType = "INTEGER"
-	case core.FloatDataType:
+	case db.FloatDataType:
 		dataType = "FLOAT"
-	case core.BooleanDataType:
+	case db.BooleanDataType:
 		dataType = "BOOLEAN"
 	}
 
