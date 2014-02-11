@@ -181,11 +181,11 @@ var_decl_association :
 ;
 
 data_type :
-    TFACTOR  { $$ = db.FactorDataType }
-|   TSTRING  { $$ = db.StringDataType }
-|   TINTEGER { $$ = db.IntegerDataType }
-|   TFLOAT   { $$ = db.FloatDataType }
-|   TBOOLEAN { $$ = db.BooleanDataType }
+    TFACTOR  { $$ = db.Factor }
+|   TSTRING  { $$ = db.String }
+|   TINTEGER { $$ = db.Integer }
+|   TFLOAT   { $$ = db.Float }
+|   TBOOLEAN { $$ = db.Boolean }
 ;
 
 assignment :

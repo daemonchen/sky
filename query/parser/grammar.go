@@ -165,6 +165,7 @@ const yyErrCode = 2
 const yyMaxDepth = 200
 
 //line grammar.y:452
+
 type within struct {
 	start int
 	end   int
@@ -653,27 +654,27 @@ yydefault:
 	case 21:
 		//line grammar.y:184
 		{
-			yyVAL.str = db.FactorDataType
+			yyVAL.str = db.Factor
 		}
 	case 22:
 		//line grammar.y:185
 		{
-			yyVAL.str = db.StringDataType
+			yyVAL.str = db.String
 		}
 	case 23:
 		//line grammar.y:186
 		{
-			yyVAL.str = db.IntegerDataType
+			yyVAL.str = db.Integer
 		}
 	case 24:
 		//line grammar.y:187
 		{
-			yyVAL.str = db.FloatDataType
+			yyVAL.str = db.Float
 		}
 	case 25:
 		//line grammar.y:188
 		{
-			yyVAL.str = db.BooleanDataType
+			yyVAL.str = db.Boolean
 		}
 	case 26:
 		//line grammar.y:193

@@ -6,5 +6,5 @@ import (
 )
 
 func (v *validator) visitBooleanLiteral(n *ast.BooleanLiteral, tbl *ast.Symtable) {
-	v.dataTypes[n] = db.BooleanDataType
+	v.dataTypes[n] = db.Boolean
 }

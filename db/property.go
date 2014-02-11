@@ -19,14 +19,14 @@ type Property struct {
 
 // Cast converts a value into the appropriate Go type based on the property's data type.
 func (p *Property) Cast(v interface{}) interface{} {
-	if p.DataType == FactorDataType || p.DataType == StringDataType {
+	if p.DataType == Factor || p.DataType == String {
 		switch v := v.(type) {
 		case string:
 			return v
 		default:
 			return ""
 		}
-	} else if p.DataType == IntegerDataType {
+	} else if p.DataType == Integer {
 		switch v := promote(v).(type) {
 		case int64:
 			return v
@@ -35,7 +35,7 @@ func (p *Property) Cast(v interface{}) interface{} {
 		default:
 			return 0
 		}
-	} else if p.DataType == FloatDataType {
+	} else if p.DataType == Float {
 		switch v := promote(v).(type) {
 		case float64:
 			return v
@@ -44,7 +44,7 @@ func (p *Property) Cast(v interface{}) interface{} {
 		default:
 			return 0
 		}
-	} else if p.DataType == BooleanDataType {
+	} else if p.DataType == Boolean {
 		switch v := v.(type) {
 		case bool:
 			return v
@@ -66,7 +66,7 @@ func (p *Property) Validate() error {
 
 	// Validate data type.
 	switch p.DataType {
-	case FactorDataType, StringDataType, IntegerDataType, FloatDataType, BooleanDataType:
+	case Factor, String, Integer, Float, Boolean:
 	default:
 		return InvalidPropertyDataTypeError
 	}

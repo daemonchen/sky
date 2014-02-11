@@ -74,8 +74,3 @@ func (c *cache) remove(key string) {
 		delete(c.valuemap, e.Value.(*entry).value)
 	}
 }
-
-// size returns the number of items in the cache.
-func (c *cache) size() int {
-	return c.ll.Len()
-}

@@ -55,15 +55,15 @@ func (v *VarDecl) IsDeclared() bool {
 func (v *VarDecl) String() string {
 	var dataType string
 	switch v.DataType {
-	case db.FactorDataType:
+	case db.Factor:
 		dataType = "FACTOR"
-	case db.StringDataType:
+	case db.String:
 		dataType = "STRING"
-	case db.IntegerDataType:
+	case db.Integer:
 		dataType = "INTEGER"
-	case db.FloatDataType:
+	case db.Float:
 		dataType = "FLOAT"
-	case db.BooleanDataType:
+	case db.Boolean:
 		dataType = "BOOLEAN"
 	}
 

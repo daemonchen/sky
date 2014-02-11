@@ -17,11 +17,11 @@ func (v *validator) exitingBinaryExpression(n *ast.BinaryExpression, tbl *ast.Sy
 	}
 
 	switch lhsType {
-	case db.BooleanDataType:
+	case db.Boolean:
 		v.exitingBooleanBinaryExpression(n, tbl)
-	case db.FactorDataType:
+	case db.Factor:
 		v.exitingFactorBinaryExpression(n, tbl)
-	case db.IntegerDataType, db.FloatDataType:
+	case db.Integer, db.Float:
 		v.exitingNumericBinaryExpression(n, tbl)
 	default:
 		v.err = errorf(n, "expression: invalid binary expression type: %s", lhsType)
@@ -31,7 +31,7 @@ func (v *validator) exitingBinaryExpression(n *ast.BinaryExpression, tbl *ast.Sy
 func (v *validator) exitingBooleanBinaryExpression(n *ast.BinaryExpression, tbl *ast.Symtable) {
 	switch n.Op {
 	case ast.OpEquals, ast.OpNotEquals, ast.OpAnd, ast.OpOr:
-		v.dataTypes[n] = db.BooleanDataType
+		v.dataTypes[n] = db.Boolean
 	default:
 		v.err = errorf(n, "expression: invalid boolean operator: %s", n.OpString())
 	}
@@ -61,7 +61,7 @@ func (v *validator) exitingFactorBinaryExpression(n *ast.BinaryExpression, tbl *
 
 	switch n.Op {
 	case ast.OpEquals, ast.OpNotEquals:
-		v.dataTypes[n] = db.BooleanDataType
+		v.dataTypes[n] = db.Boolean
 	default:
 		v.err = errorf(n, "expression: invalid factor operator: %s", n.OpString())
 	}
@@ -70,15 +70,15 @@ func (v *validator) exitingFactorBinaryExpression(n *ast.BinaryExpression, tbl *
 func (v *validator) exitingNumericBinaryExpression(n *ast.BinaryExpression, tbl *ast.Symtable) {
 	switch n.Op {
 	case ast.OpEquals, ast.OpNotEquals:
-		v.dataTypes[n] = db.BooleanDataType
+		v.dataTypes[n] = db.Boolean
 	case ast.OpGreaterThan, ast.OpGreaterThanOrEqualTo:
-		v.dataTypes[n] = db.BooleanDataType
+		v.dataTypes[n] = db.Boolean
 	case ast.OpLessThan, ast.OpLessThanOrEqualTo:
-		v.dataTypes[n] = db.BooleanDataType
+		v.dataTypes[n] = db.Boolean
 	case ast.OpPlus, ast.OpMinus:
-		v.dataTypes[n] = db.IntegerDataType
+		v.dataTypes[n] = db.Integer
 	case ast.OpMultiply, ast.OpDivide:
-		v.dataTypes[n] = db.IntegerDataType
+		v.dataTypes[n] = db.Integer
 	default:
 		v.err = errorf(n, "expression: invalid numeric operator: %s", n.OpString())
 	}

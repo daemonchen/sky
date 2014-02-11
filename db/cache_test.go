@@ -62,3 +62,14 @@ func TestFactorCacheRemove(t *testing.T) {
 	_, ok = c.getValue("foo1")
 	assert.Equal(t, ok, true)
 }
+
+func TestFactorCacheReplace(t *testing.T) {
+	c := newCache(2)
+	c.add("foo0", 1)
+	c.add("foo1", 2)
+	c.add("foo0", 3)
+	value, _ := c.getValue("foo0")
+	assert.Equal(t, value, uint64(3))
+	value, _ = c.getValue("foo1")
+	assert.Equal(t, value, uint64(2))
+}

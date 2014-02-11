@@ -6,5 +6,5 @@ import (
 )
 
 func (v *validator) visitStringLiteral(n *ast.StringLiteral, tbl *ast.Symtable) {
-	v.dataTypes[n] = db.FactorDataType
+	v.dataTypes[n] = db.Factor
 }

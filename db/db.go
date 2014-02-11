@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/skydb/sky/hash"
+	"github.com/szferi/gomdb"
 )
 
 // DB represents access to the low-level data store.
@@ -154,23 +155,6 @@ func (db *db) shardCount() (int, error) {
 	return count, nil
 }
 
-// LockAll obtains locks on the database and all shards.
-func (db *db) LockAll() {
-	db.Lock()
-	for _, s := range db.shards {
-		s.Lock()
-	}
-}
-
-// UnlockAll releases locks on the database and all shards.
-// Only use this with LockAll().
-func (db *db) UnlockAll() {
-	db.Unlock()
-	for _, s := range db.shards {
-		s.Unlock()
-	}
-}
-
 // Factorizer returns a table's factorizer.
 func (db *db) Factorizer(tablespace string) (*Factorizer, error) {
 	db.Lock()
@@ -304,4 +288,14 @@ func (db *db) Stats() ([]*Stat, error) {
 		stats = append(stats, stat)
 	}
 	return stats, nil
+}
+
+// options creates an LMDB flagset.
+func options(noSync bool) uint {
+	flagset := uint(0)
+	flagset |= mdb.NOTLS
+	if noSync {
+		flagset |= mdb.NOSYNC
+	}
+	return flagset
 }

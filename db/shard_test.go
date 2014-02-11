@@ -36,7 +36,7 @@ func TestShardMergeEvent(t *testing.T) {
 		assert.Nil(t, err, "")
 		assert.Equal(t, e.Timestamp, musttime("2000-01-02T00:00:00Z"), "")
 		assert.Equal(t, e.Data[1], "ddd", "")
-		assert.Equal(t, e.Data[2], 300, "")
+		assert.Equal(t, e.Data[2], int64(300), "")
 	})
 }
 

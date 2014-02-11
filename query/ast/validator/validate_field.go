@@ -38,7 +38,7 @@ func (v *validator) exitingField(n *ast.Field, tbl *ast.Symtable) {
 		expressionType := v.dataTypes[n.Expression]
 
 		switch expressionType {
-		case db.IntegerDataType, db.FloatDataType:
+		case db.Integer, db.Float:
 		default:
 			v.err = errorf(n, "field: invalid expression data type: %s", expressionType)
 		}

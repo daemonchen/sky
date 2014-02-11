@@ -54,13 +54,13 @@ func (r *Reducer) reduceSelectionDimensions(node *ast.Selection, h *hashmap.Hash
 		// Convert value to appropriate type based on variable decl.
 		var keyString string
 		switch decl.DataType {
-		case db.StringDataType:
+		case db.String:
 			return fmt.Errorf("reduce: string dimensions are not supported: %s", dimension.Name)
-		case db.FloatDataType:
+		case db.Float:
 			return fmt.Errorf("reduce: float dimensions are not supported: %s", dimension.Name)
-		case db.IntegerDataType:
+		case db.Integer:
 			keyString = strconv.Itoa(int(key))
-		case db.FactorDataType:
+		case db.Factor:
 			var err error
 			decl := tbl.Find(dimension.Name)
 			name := decl.Association
@@ -70,7 +70,7 @@ func (r *Reducer) reduceSelectionDimensions(node *ast.Selection, h *hashmap.Hash
 			if keyString, err = r.factorizer.Defactorize(name, uint64(key)); err != nil {
 				return fmt.Errorf("reduce: factor not found: %s/%d", name, uint64(key))
 			}
-		case db.BooleanDataType:
+		case db.Boolean:
 			if key == 0 {
 				keyString = "false"
 			} else {

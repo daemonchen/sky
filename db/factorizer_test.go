@@ -9,6 +9,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Ensure that we open a factorizer.
+func TestFactorizerOpen(t *testing.T) {
+	path, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(path)
+
+	f := NewFactorizer()
+	assert.NoError(t, f.Open(path))
+	assert.Equal(t, path, f.Path())
+	f.Close()
+}
+
 // Ensure that we can factorize and defactorize values.
 func TestFactorizer(t *testing.T) {
 	withFactorizer(func(f *Factorizer) {

@@ -106,7 +106,7 @@ func (m *Mapper) isFactorVarRef(node ast.Expression, tbl *ast.Symtable) bool {
 		return false
 	}
 	decl := tbl.Find(ref.Name)
-	return (decl != nil && decl.DataType == db.FactorDataType)
+	return (decl != nil && decl.DataType == db.Factor)
 }
 
 func (m *Mapper) promoteOperands(lhs, rhs llvm.Value) (llvm.Value, llvm.Value, bool) {
@@ -150,10 +150,8 @@ func (m *Mapper) codegenFactorEquality(node *ast.BinaryExpression, lhs *ast.VarR
 		}
 
 		id, err := m.factorizer.Factorize(name, rhs.Value, false)
-		if err != nil {
-			if _, ok := err.(*db.FactorNotFound); !ok {
-				return nilValue, err
-			}
+		if err == db.FactorNotFoundError {
+			return nilValue, err
 		}
 		return m.icmp(op, lhsValue, m.constint(int(id)), ""), nil
 

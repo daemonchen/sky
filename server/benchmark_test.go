@@ -57,11 +57,11 @@ func randomString(l int) string {
 
 func randomValueForProperty(p *db.Property) interface{} {
 	switch p.DataType {
-	case db.StringDataType, db.FactorDataType:
+	case db.String, db.Factor:
 		return randomString(1 + rand.Int()%10)
-	case db.IntegerDataType:
+	case db.Integer:
 		return rand.Int() % 10000000
-	case db.FloatDataType:
+	case db.Float:
 		return rand.Float64()
 	}
 	return ""

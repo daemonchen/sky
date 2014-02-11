@@ -8,6 +8,10 @@ import (
 	"sync"
 )
 
+var (
+	FactorNotFoundError = &Error{"factor not found", nil}
+)
+
 // maxKeySize is the size, in bytes, of the largest key that can be inserted.
 // This is a limitation of LMDB.
 const maxKeySize = 500
@@ -62,19 +66,19 @@ func (f *Factorizer) Open(path string) error {
 		return err
 	}
 	if f.env, err = mdb.NewEnv(); err != nil {
-		return fmt.Errorf("factor env error: %s", err)
+		return &Error{"factor env error", err}
 	}
 
 	// LMDB environment settings.
 	if err := f.env.SetMaxDBs(mdb.DBI(f.MaxDBs)); err != nil {
 		f.close()
-		return fmt.Errorf("factor maxdbs error: %s", err)
+		return &Error{"factor maxdbs error", err}
 	} else if err := f.env.SetMaxReaders(f.MaxReaders); err != nil {
 		f.close()
-		return fmt.Errorf("factor maxreaders error: %s", err)
+		return &Error{"factor maxreaders error", err}
 	} else if err := f.env.SetMapSize(2 << 40); err != nil {
 		f.close()
-		return fmt.Errorf("factor map size error: %s", err)
+		return &Error{"factor map size error:", err}
 	}
 
 	// Create LMDB flagset.
@@ -86,13 +90,13 @@ func (f *Factorizer) Open(path string) error {
 	// Open the LMDB environment.
 	if err := f.env.Open(f.path, options, 0664); err != nil {
 		f.close()
-		return fmt.Errorf("factor env open error: %s", err)
+		return &Error{"factor env open error", err}
 	}
 
 	// Open the writer.
 	if err = f.renew(); err != nil {
 		f.close()
-		return fmt.Errorf("factor txn open error: %s", err)
+		return &Error{"factor txn open error", err}
 	}
 
 	// Initialize the cache.
@@ -148,7 +152,7 @@ func (f *Factorizer) FactorizeEvent(event *Event, properties Properties, createI
 
 	for k, v := range event.Data {
 		property := properties.FindById(k)
-		if property.DataType == FactorDataType {
+		if property.DataType == Factor {
 			if stringValue, ok := v.(string); ok {
 				sequence, err := f.factorize(property.Name, stringValue, createIfMissing)
 				if err != nil {
@@ -174,7 +178,7 @@ func (f *Factorizer) DefactorizeEvent(event *Event, properties Properties) error
 
 	for k, v := range event.Data {
 		property := properties.FindById(k)
-		if property.DataType == FactorDataType {
+		if property.DataType == Factor {
 			var sequence uint64
 			switch v := v.(type) {
 			case int8:
@@ -223,7 +227,7 @@ func (f *Factorizer) factorize(id string, value string, createIfMissing bool) (u
 	// Otherwise find it in the database.
 	dbi, err := f.txn.DBIOpen(&id, mdb.CREATE)
 	if err != nil {
-		return 0, fmt.Errorf("factor factorize dbi error: %s", err)
+		return 0, &Error{"factorize dbi error", err}
 	}
 
 	data, err := f.get(dbi, f.key(value))
@@ -238,8 +242,7 @@ func (f *Factorizer) factorize(id string, value string, createIfMissing bool) (u
 		return f.add(dbi, id, value)
 	}
 
-	err = NewFactorNotFound(fmt.Sprintf("factor not found: %s: %v", id, f.key(value)))
-	return 0, err
+	return 0, FactorNotFoundError
 }
 
 // add creates a new factor for a given value.
@@ -287,14 +290,14 @@ func (f *Factorizer) defactorize(id string, value uint64) (string, error) {
 	// Otherwise find it in the database.
 	dbi, err := f.txn.DBIOpen(&id, mdb.CREATE)
 	if err != nil {
-		return "", fmt.Errorf("factor defactorize dbi error: %s", err)
+		return "", &Error{"defactorize dbi error", err}
 	}
 
 	data, err := f.get(dbi, f.revkey(value))
 	if err != nil {
 		return "", err
 	} else if data == nil {
-		return "", fmt.Errorf("factor not found: %v", f.revkey(value))
+		return "", FactorNotFoundError
 	}
 
 	// Add to cache.
@@ -333,7 +336,7 @@ func (f *Factorizer) nextid(dbi mdb.DBI) (uint64, error) {
 func (f *Factorizer) get(dbi mdb.DBI, key string) ([]byte, error) {
 	data, err := f.txn.Get(dbi, []byte(key))
 	if err != nil && err != mdb.NotFound {
-		return nil, fmt.Errorf("factor get error: %s", err)
+		return nil, &Error{"factor get error", err}
 	}
 	return data, nil
 }
@@ -341,7 +344,7 @@ func (f *Factorizer) get(dbi mdb.DBI, key string) ([]byte, error) {
 // Sets the value for a given key in the database.
 func (f *Factorizer) put(dbi mdb.DBI, key string, value []byte) error {
 	if err := f.txn.Put(dbi, []byte(key), value, mdb.NODUPDATA); err != nil {
-		return fmt.Errorf("factor put error: %s", err)
+		return &Error{"factor put error", err}
 	}
 	f.dirty = true
 	return nil
@@ -362,7 +365,7 @@ func (f *Factorizer) renew() error {
 	if f.txn == nil {
 		var err error
 		if f.txn, err = f.env.BeginTxn(nil, 0); err != nil {
-			return fmt.Errorf("renew txn error: %s", err)
+			return &Error{"renew txn error", err}
 		}
 	}
 

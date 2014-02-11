@@ -30,7 +30,7 @@ func (v *validator) exitingSelection(n *ast.Selection, tbl *ast.Symtable) {
 	for _, dimension := range n.Dimensions {
 		decl := tbl.Find(dimension.Name)
 		switch decl.DataType {
-		case db.StringDataType, db.FloatDataType:
+		case db.String, db.Float:
 			v.err = errorf(n, "selection: %s variables cannot be used as dimensions: %s", decl.DataType, dimension.Name)
 			return
 		}

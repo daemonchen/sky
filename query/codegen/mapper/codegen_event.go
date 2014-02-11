@@ -31,16 +31,16 @@ func (m *Mapper) codegenEventType() llvm.Type {
 		var field llvm.Type
 
 		switch decl.DataType {
-		case db.StringDataType:
+		case db.String:
 			field = m.context.StructType([]llvm.Type{
 				m.context.Int64Type(),
 				llvm.PointerType(m.context.VoidType(), 0),
 			}, false)
-		case db.IntegerDataType, db.FactorDataType:
+		case db.Integer, db.Factor:
 			field = m.context.Int64Type()
-		case db.FloatDataType:
+		case db.Float:
 			field = m.context.DoubleType()
-		case db.BooleanDataType:
+		case db.Boolean:
 			field = m.context.Int64Type()
 		}
 
@@ -222,7 +222,7 @@ func (m *Mapper) codegenEventCopyFunc(functionName string, filter func(*ast.VarD
 	for _, decl := range m.decls {
 		if filter == nil || filter(decl) {
 			switch decl.DataType {
-			case db.IntegerDataType, db.FactorDataType, db.FloatDataType, db.BooleanDataType:
+			case db.Integer, db.Factor, db.Float, db.Boolean:
 				m.store(m.load(m.structgep(m.load(src, ""), decl.Index())), m.structgep(m.load(dest, ""), decl.Index()))
 			}
 		}
@@ -250,11 +250,11 @@ func (m *Mapper) codegenEventResetFunc(functionName string, filter func(*ast.Var
 	for index, decl := range m.decls {
 		if filter == nil || filter(decl) {
 			switch decl.DataType {
-			case db.StringDataType:
+			case db.String:
 				panic("NOT YET IMPLEMENTED: clear_event [string]")
-			case db.IntegerDataType, db.FactorDataType, db.BooleanDataType:
+			case db.Integer, db.Factor, db.Boolean:
 				m.store(m.constint(0), m.structgep(m.load(event), index, decl.Name))
-			case db.FloatDataType:
+			case db.Float:
 				m.store(m.constfloat(0), m.structgep(m.load(event), index, decl.Name))
 			}
 		}
@@ -366,17 +366,17 @@ func (m *Mapper) codegenReadEventFunc() llvm.Value {
 	for i, decl := range read_decls {
 		m.builder.SetInsertPointAtEnd(read_labels[i])
 
-		if decl.DataType == db.StringDataType {
+		if decl.DataType == db.String {
 			panic("NOT YET IMPLEMENTED: read_event [string]")
 		}
 
 		var minipack_func_name string
 		switch decl.DataType {
-		case db.IntegerDataType, db.FactorDataType:
+		case db.Integer, db.Factor:
 			minipack_func_name = "minipack_unpack_int"
-		case db.FloatDataType:
+		case db.Float:
 			minipack_func_name = "minipack_unpack_double"
-		case db.BooleanDataType:
+		case db.Boolean:
 			minipack_func_name = "minipack_unpack_bool"
 		}
 

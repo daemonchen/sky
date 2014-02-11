@@ -6,5 +6,5 @@ import (
 )
 
 func (v *validator) visitIntegerLiteral(n *ast.IntegerLiteral, tbl *ast.Symtable) {
-	v.dataTypes[n] = db.IntegerDataType
+	v.dataTypes[n] = db.Integer
 }

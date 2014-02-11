@@ -2,10 +2,14 @@ package db
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sort"
+)
+
+var (
+	DuplicatePropertyError = &Error{"duplicate property error", nil}
+	PropertyNotFoundError  = &Error{"property not found", nil}
 )
 
 // Properties represents a list of properties on a table.
@@ -15,7 +19,7 @@ type Properties map[string]*Property
 func (p Properties) Create(name string, transient bool, dataType string) (*Property, error) {
 	// Don't allow duplicate names.
 	if p[name] != nil {
-		return nil, errors.New("duplicate property error")
+		return nil, DuplicatePropertyError
 	}
 
 	// Create and validate property.
@@ -95,10 +99,6 @@ func (p Properties) Decode(r io.Reader) error {
 
 	return nil
 }
-
-//--------------------------------------
-// Normalization
-//--------------------------------------
 
 // Converts a map with string keys to use property identifier keys.
 func (p Properties) NormalizeMap(m map[string]interface{}) (map[int64]interface{}, error) {
