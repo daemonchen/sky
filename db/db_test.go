@@ -3,6 +3,7 @@ package db
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 	"time"
@@ -11,13 +12,18 @@ import (
 	"github.com/szferi/gomdb"
 )
 
-func TestDB(t *testing.T) {
-	db := New("/tmp/sky", 0, true, 1000, 100)
-	assert.Equal(t, db.dataPath(), "/tmp/sky/data", "")
-	assert.Equal(t, db.shardPath(2), "/tmp/sky/data/2", "")
-	assert.Equal(t, int(db.MaxDBs), 1000, "")
-	assert.Equal(t, db.MaxReaders, uint(100), "")
-	assert.Equal(t, db.NoSync, true, "")
+func TestDBOpen(t *testing.T) {
+	path, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(path)
+
+	db := &DB{}
+	assert.NoError(t, db.Open(path, 2))
+	assert.Equal(t, path, db.Path())
+	assert.Equal(t, len(db.shards), 2)
+	assert.Equal(t, filepath.Join(path, "data"), db.dataPath())
+	assert.Equal(t, filepath.Join(path, "data", "2"), db.shardPath(2))
+	assert.Equal(t, filepath.Join(path, "factors"), db.factorsPath())
+	db.Close()
 }
 
 func TestDBInsertEvent(t *testing.T) {
@@ -157,10 +163,13 @@ func TestDBMerge(t *testing.T) {
 
 func TestDBReopen(t *testing.T) {
 	withDB(2, func(db *DB) {
+		path := db.Path()
+
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.Close()
+		assert.Equal(t, "", db.Path())
 
-		err := db.Open()
+		err := db.Open(path, 0)
 		assert.Nil(t, err, "")
 		assert.Equal(t, len(db.shards), 2, "")
 
@@ -219,8 +228,8 @@ func withDB(shardCount int, f func(db *DB)) {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
-	db := New(path, shardCount, false, 4096, 126)
-	if err := db.Open(); err != nil {
+	db := &DB{}
+	if err := db.Open(path, shardCount); err != nil {
 		panic(err.Error())
 	}
 	defer db.Close()

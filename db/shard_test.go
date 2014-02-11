@@ -120,8 +120,8 @@ func withShard(f func(*shard)) {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
-	s := newShard(path)
-	if err := s.Open(4096, 126, options(false)); err != nil {
+	s := &shard{}
+	if err := s.Open(path); err != nil {
 		panic(err.Error())
 	}
 	defer s.Close()

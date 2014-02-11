@@ -13,8 +13,11 @@ import (
 // shard represents a subset of the database stored in a single LMDB environment.
 type shard struct {
 	sync.Mutex
-	path string
-	env  *mdb.Env
+	path       string
+	env        *mdb.Env
+	noSync     bool
+	maxDBs     uint
+	maxReaders uint
 }
 
 type Stat struct {
@@ -42,52 +45,38 @@ func newShard(path string) *shard {
 	return &shard{path: path}
 }
 
-func (s *shard) Stat() (*Stat, error) {
-	stat, err := s.env.Stat()
-	if err != nil {
-		return nil, err
-	}
-	info, err := s.env.Info()
-	if err != nil {
-		return nil, err
-	}
-	ss := &Stat{
-		Entries: stat.Entries,
-		Size:    info.MapSize,
-		Depth:   stat.Depth,
-	}
-	ss.Transactions.Last = info.LastTxnID
-	ss.Readers.Max = info.MaxReaders
-	ss.Readers.Current = info.NumReaders
-	ss.Pages.Last = info.LastPNO
-	ss.Pages.Size = stat.PSize
-	ss.Pages.Branch = stat.BranchPages
-	ss.Pages.Leaf = stat.LeafPages
-	ss.Pages.Overflow = stat.OwerflowPages
-	return ss, nil
-}
-
 // Open allocates a new LMDB environment.
-func (s *shard) Open(maxDBs uint, maxReaders uint, options uint) error {
+func (s *shard) Open(path string) error {
 	s.Lock()
 	defer s.Unlock()
 	s.close()
 
+	// Initialize the shard path.
+	s.path = path
 	if err := os.MkdirAll(s.path, 0700); err != nil {
 		return err
 	}
 
+	// Create LMDB environment.
 	var err error
 	s.env, err = mdb.NewEnv()
 	if err != nil {
 		return &Error{"shard env error", err}
 	}
 
+	// Default LMDB settings.
+	if s.maxDBs == 0 {
+		s.maxDBs = 4096
+	}
+	if s.maxReaders == 0 {
+		s.maxReaders = 126
+	}
+
 	// LMDB environment settings.
-	if err := s.env.SetMaxDBs(mdb.DBI(maxDBs)); err != nil {
+	if err := s.env.SetMaxDBs(mdb.DBI(s.maxDBs)); err != nil {
 		s.close()
 		return &Error{"shard maxdbs error", err}
-	} else if err := s.env.SetMaxReaders(maxReaders); err != nil {
+	} else if err := s.env.SetMaxReaders(s.maxReaders); err != nil {
 		s.close()
 		return &Error{"shard maxreaders error", err}
 	} else if err := s.env.SetMapSize(2 << 40); err != nil {
@@ -96,7 +85,7 @@ func (s *shard) Open(maxDBs uint, maxReaders uint, options uint) error {
 	}
 
 	// Open the LMDB environment.
-	if err := s.env.Open(s.path, options, 0664); err != nil {
+	if err := s.env.Open(s.path, options(s.noSync), 0664); err != nil {
 		s.close()
 		return &Error{"shard open error", err}
 	}
@@ -425,6 +414,31 @@ func (s *shard) drop(tablespace string) error {
 	return nil
 }
 
+func (s *shard) Stat() (*Stat, error) {
+	stat, err := s.env.Stat()
+	if err != nil {
+		return nil, err
+	}
+	info, err := s.env.Info()
+	if err != nil {
+		return nil, err
+	}
+	ss := &Stat{
+		Entries: stat.Entries,
+		Size:    info.MapSize,
+		Depth:   stat.Depth,
+	}
+	ss.Transactions.Last = info.LastTxnID
+	ss.Readers.Max = info.MaxReaders
+	ss.Readers.Current = info.NumReaders
+	ss.Pages.Last = info.LastPNO
+	ss.Pages.Size = stat.PSize
+	ss.Pages.Branch = stat.BranchPages
+	ss.Pages.Leaf = stat.LeafPages
+	ss.Pages.Overflow = stat.OwerflowPages
+	return ss, nil
+}
+
 func (s *shard) txn(tablespace string, readOnly bool) (*mdb.Txn, mdb.DBI, error) {
 	var flags uint = 0
 	if readOnly {
@@ -448,4 +462,14 @@ func (s *shard) txn(tablespace string, readOnly bool) (*mdb.Txn, mdb.DBI, error)
 	}
 
 	return txn, dbi, nil
+}
+
+// options creates an LMDB flagset.
+func options(noSync bool) uint {
+	flagset := uint(0)
+	flagset |= mdb.NOTLS
+	if noSync {
+		flagset |= mdb.NOSYNC
+	}
+	return flagset
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/skydb/sky/hash"
-	"github.com/szferi/gomdb"
 )
 
 // DB represents Sky's file-back data store.
@@ -27,21 +26,8 @@ type DB struct {
 	shards            []*shard
 }
 
-// Creates a new DB instance with data storage at the given path.
-func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReaders uint) *DB {
-	// Default the shard count to the number of logical cores.
-	if defaultShardCount == 0 {
-		defaultShardCount = runtime.NumCPU()
-	}
-
-	return &DB{
-		defaultShardCount: defaultShardCount,
-		factorizers:       make(map[string]*Factorizer),
-		path:              path,
-		NoSync:            noSync,
-		MaxDBs:            maxDBs,
-		MaxReaders:        maxReaders,
-	}
+func (db *DB) Path() string {
+	return db.path
 }
 
 func (db *DB) dataPath() string {
@@ -57,9 +43,13 @@ func (db *DB) shardPath(index int) string {
 }
 
 // Opens the database.
-func (db *DB) Open() error {
+func (db *DB) Open(path string, shardCount int) error {
 	db.Lock()
 	defer db.Unlock()
+
+	// Initialize poperties.
+	db.path = path
+	db.factorizers = make(map[string]*Factorizer)
 
 	// Create directory if it doesn't exist.
 	if err := os.MkdirAll(db.dataPath(), 0700); err != nil {
@@ -69,17 +59,27 @@ func (db *DB) Open() error {
 		return err
 	}
 
-	// Determine shard count.
-	shardCount, err := db.shardCount()
+	// If database already exists then use the existing number of shards.
+	n, err := db.shardCount()
 	if err != nil {
 		return err
+	} else if n > 0 {
+		shardCount = n
+	} else if shardCount == 0 {
+		shardCount = runtime.NumCPU()
 	}
 
 	// Create and open each shard.
 	db.shards = make([]*shard, 0)
 	for i := 0; i < shardCount; i++ {
-		db.shards = append(db.shards, newShard(db.shardPath(i)))
-		if err := db.shards[i].Open(db.MaxDBs, db.MaxReaders, options(db.NoSync)); err != nil {
+		shard := &shard{
+			maxDBs:     db.MaxDBs,
+			maxReaders: db.MaxReaders,
+			noSync:     db.NoSync,
+		}
+
+		db.shards = append(db.shards, shard)
+		if err := shard.Open(db.shardPath(i)); err != nil {
 			db.close()
 			return err
 		}
@@ -96,15 +96,19 @@ func (db *DB) Close() {
 }
 
 func (db *DB) close() {
+	// Close factorizers.
 	for _, f := range db.factorizers {
 		f.Close()
 	}
 	db.factorizers = nil
 
+	// Close shards.
 	for _, s := range db.shards {
 		s.Close()
 	}
 	db.shards = nil
+
+	db.path = ""
 }
 
 // getShardByObjectId retrieves the appropriate shard for a given object identifier.
@@ -270,14 +274,4 @@ func (db *DB) Stats() ([]*Stat, error) {
 		stats = append(stats, stat)
 	}
 	return stats, nil
-}
-
-// options creates an LMDB flagset.
-func options(noSync bool) uint {
-	flagset := uint(0)
-	flagset |= mdb.NOTLS
-	if noSync {
-		flagset |= mdb.NOSYNC
-	}
-	return flagset
 }

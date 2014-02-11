@@ -54,8 +54,8 @@ func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) erro
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
-	db := db.New(path, shardCount, false, 4096, 126)
-	if err := db.Open(); err != nil {
+	db := &db.DB{}
+	if err := db.Open(path, shardCount); err != nil {
 		debugln("run.mapper.!")
 		return err
 	}

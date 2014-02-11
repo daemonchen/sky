@@ -144,8 +144,8 @@ func (s *Server) open() error {
 	}
 
 	// Initialize and open database.
-	s.db = db.New(s.path, 0, s.NoSync, s.MaxDBs, s.MaxReaders)
-	if err = s.db.Open(); err != nil {
+	s.db = &db.DB{}
+	if err = s.db.Open(s.path, 0); err != nil {
 		s.close()
 		return err
 	}

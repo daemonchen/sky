@@ -69,6 +69,14 @@ func (f *Factorizer) Open(path string) error {
 		return &Error{"factor env error", err}
 	}
 
+	// Default LMDB settings.
+	if f.MaxDBs == 0 {
+		f.MaxDBs = 4096
+	}
+	if f.MaxReaders == 0 {
+		f.MaxReaders = 126
+	}
+
 	// LMDB environment settings.
 	if err := f.env.SetMaxDBs(mdb.DBI(f.MaxDBs)); err != nil {
 		f.close()
