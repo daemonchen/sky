@@ -12,7 +12,7 @@ import (
 )
 
 func TestDB(t *testing.T) {
-	db := New("/tmp/sky", 0, true, 1000, 100).(*db)
+	db := New("/tmp/sky", 0, true, 1000, 100)
 	assert.Equal(t, db.dataPath(), "/tmp/sky/data", "")
 	assert.Equal(t, db.shardPath(2), "/tmp/sky/data/2", "")
 	assert.Equal(t, int(db.MaxDBs), 1000, "")
@@ -21,7 +21,7 @@ func TestDB(t *testing.T) {
 }
 
 func TestDBInsertEvent(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		assert.NoError(t, db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john")))
 		e, err := db.GetEvent("foo", "bar", musttime("2000-01-01T00:00:00Z"))
 		assert.Nil(t, err, "")
@@ -31,7 +31,7 @@ func TestDBInsertEvent(t *testing.T) {
 }
 
 func TestDBInsertEvents(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		input := []*Event{
 			testevent("2000-01-01T00:00:02Z", 2, 100),
 			testevent("2000-01-01T00:00:00Z", 1, "john"),
@@ -48,7 +48,7 @@ func TestDBInsertEvents(t *testing.T) {
 }
 
 func TestDBInsertObjects(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		input := map[string][]*Event{
 			"bar": []*Event{
 				testevent("2000-01-01T00:00:02Z", 2, 100),
@@ -80,7 +80,7 @@ func TestDBInsertObjects(t *testing.T) {
 }
 
 func TestDBInsertNonSequentialEvents(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-02T00:00:00Z", 1, "john", -1, 100))
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "jane", 2, "test"))
 		db.InsertEvent("foo", "bar", testevent("2000-01-03T00:00:00Z", 1, "jose"))
@@ -103,7 +103,7 @@ func TestDBInsertNonSequentialEvents(t *testing.T) {
 }
 
 func TestDBDeleteEvent(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.DeleteEvent("foo", "bar", musttime("2000-01-01T00:00:00Z"))
 		e, err := db.GetEvent("foo", "bar", musttime("2000-01-01T00:00:00Z"))
@@ -113,7 +113,7 @@ func TestDBDeleteEvent(t *testing.T) {
 }
 
 func TestDBDeleteMissingEvent(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.DeleteEvent("foo", "bar", musttime("2000-01-02T00:00:00Z"))
 		e, err := db.GetEvent("foo", "bar", musttime("2000-01-01T00:00:00Z"))
@@ -123,7 +123,7 @@ func TestDBDeleteMissingEvent(t *testing.T) {
 }
 
 func TestDBDeleteObject(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.InsertEvent("foo", "bar", testevent("2000-01-02T00:00:00Z", 1, "jane"))
 		db.DeleteObject("foo", "bar")
@@ -134,7 +134,7 @@ func TestDBDeleteObject(t *testing.T) {
 }
 
 func TestDBMerge(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-03T00:00:00Z", 1, "john"))
 		db.InsertEvent("foo", "bar", testevent("2000-01-02T00:00:00Z", 1, "jane"))
 		db.InsertEvent("foo", "bat", testevent("2000-01-02T00:00:00Z", 1, "joe"))
@@ -156,7 +156,7 @@ func TestDBMerge(t *testing.T) {
 }
 
 func TestDBReopen(t *testing.T) {
-	withDB(2, func(db *db) {
+	withDB(2, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.Close()
 
@@ -172,7 +172,7 @@ func TestDBReopen(t *testing.T) {
 }
 
 func TestDBCursors(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.InsertEvent("foo", "baz", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		cursors, err := db.Cursors("foo")
@@ -196,7 +196,7 @@ func TestDBCursors(t *testing.T) {
 }
 
 func TestDBStats(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		count, err := db.shardCount()
 		assert.Nil(t, err, "")
 		stats, err := db.Stats()
@@ -206,7 +206,7 @@ func TestDBStats(t *testing.T) {
 }
 
 func TestDBDrop(t *testing.T) {
-	withDB(0, func(db *db) {
+	withDB(0, func(db *DB) {
 		db.InsertEvent("foo", "bar", testevent("2000-01-01T00:00:00Z", 1, "john"))
 		db.Drop("foo")
 		e, err := db.GetEvent("foo", "bar", musttime("2000-01-01T00:00:00Z"))
@@ -215,11 +215,11 @@ func TestDBDrop(t *testing.T) {
 	})
 }
 
-func withDB(shardCount int, f func(db *db)) {
+func withDB(shardCount int, f func(db *DB)) {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
-	db := New(path, shardCount, false, 4096, 126).(*db)
+	db := New(path, shardCount, false, 4096, 126)
 	if err := db.Open(); err != nil {
 		panic(err.Error())
 	}

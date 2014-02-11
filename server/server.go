@@ -24,7 +24,7 @@ type Server struct {
 	*http.Server
 	*mux.Router
 	logger           *log.Logger
-	db               db.DB
+	db               *db.DB
 	path             string
 	listener         net.Listener
 	tables           map[string]*db.Table

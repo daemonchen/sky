@@ -50,7 +50,7 @@ func debugln(a ...interface{}) (n int, err error) {
 }
 
 // Executes a query against a multiple shards and return the results.
-func withDB(objects map[string][]*db.Event, shardCount int, fn func(db.DB) error) error {
+func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) error) error {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
@@ -75,7 +75,7 @@ func withDB(objects map[string][]*db.Event, shardCount int, fn func(db.DB) error
 // Executes a query against a given set of data and return the results.
 func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
 	var h *hashmap.Hashmap
-	err := runDBMappers(1, query, decls, objects, func(db db.DB, results []*hashmap.Hashmap) error {
+	err := runDBMappers(1, query, decls, objects, func(db *db.DB, results []*hashmap.Hashmap) error {
 		if len(results) > 0 {
 			h = results[0]
 		}
@@ -85,8 +85,8 @@ func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Even
 }
 
 // Executes a query against a multiple shards and return the results.
-func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[string][]*db.Event, fn func(db.DB, []*hashmap.Hashmap) error) error {
-	err := withDB(objects, shardCount, func(db db.DB) error {
+func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[string][]*db.Event, fn func(*db.DB, []*hashmap.Hashmap) error) error {
+	err := withDB(objects, shardCount, func(db *db.DB) error {
 		// Retrieve cursors.
 		cursors, err := db.Cursors("TBL")
 		if err != nil {
@@ -144,7 +144,7 @@ func runDBMapReducer(shardCount int, query string, decls ast.VarDecls, objects m
 	q.DeclaredVarDecls = append(q.DeclaredVarDecls, decls...)
 	q.Finalize()
 
-	err := runDBMappers(shardCount, query, decls, objects, func(db db.DB, results []*hashmap.Hashmap) error {
+	err := runDBMappers(shardCount, query, decls, objects, func(db *db.DB, results []*hashmap.Hashmap) error {
 		f, err := db.Factorizer("TBL")
 		if err != nil {
 			return err

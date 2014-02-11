@@ -14,26 +14,8 @@ import (
 	"github.com/szferi/gomdb"
 )
 
-// DB represents access to the low-level data store.
-type DB interface {
-	Open() error
-	Close()
-	Factorizer(tablespace string) (*Factorizer, error)
-	Cursors(tablespace string) (Cursors, error)
-	GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error)
-	GetEvents(tablespace string, id string) ([]*Event, error)
-	InsertEvent(tablespace string, id string, event *Event) error
-	InsertEvents(tablespace string, id string, newEvents []*Event) error
-	InsertObjects(tablespace string, objects map[string][]*Event) (int, error)
-	DeleteEvent(tablespace string, id string, timestamp time.Time) error
-	DeleteObject(tablespace string, id string) error
-	Merge(tablespace string, destinationId string, sourceId string) error
-	Drop(tablespace string) error
-	Stats() ([]*Stat, error)
-}
-
-// db is the default implementation of the DB interface.
-type db struct {
+// DB represents Sky's file-back data store.
+type DB struct {
 	sync.RWMutex
 	NoSync     bool
 	MaxDBs     uint
@@ -46,13 +28,13 @@ type db struct {
 }
 
 // Creates a new DB instance with data storage at the given path.
-func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReaders uint) DB {
+func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReaders uint) *DB {
 	// Default the shard count to the number of logical cores.
 	if defaultShardCount == 0 {
 		defaultShardCount = runtime.NumCPU()
 	}
 
-	return &db{
+	return &DB{
 		defaultShardCount: defaultShardCount,
 		factorizers:       make(map[string]*Factorizer),
 		path:              path,
@@ -62,20 +44,20 @@ func New(path string, defaultShardCount int, noSync bool, maxDBs uint, maxReader
 	}
 }
 
-func (db *db) dataPath() string {
+func (db *DB) dataPath() string {
 	return filepath.Join(db.path, "data")
 }
 
-func (db *db) factorsPath() string {
+func (db *DB) factorsPath() string {
 	return filepath.Join(db.path, "factors")
 }
 
-func (db *db) shardPath(index int) string {
+func (db *DB) shardPath(index int) string {
 	return filepath.Join(db.dataPath(), strconv.Itoa(index))
 }
 
 // Opens the database.
-func (db *db) Open() error {
+func (db *DB) Open() error {
 	db.Lock()
 	defer db.Unlock()
 
@@ -107,13 +89,13 @@ func (db *db) Open() error {
 }
 
 // Close shuts down all open database resources.
-func (db *db) Close() {
+func (db *DB) Close() {
 	db.Lock()
 	defer db.Unlock()
 	db.close()
 }
 
-func (db *db) close() {
+func (db *DB) close() {
 	for _, f := range db.factorizers {
 		f.Close()
 	}
@@ -126,7 +108,7 @@ func (db *db) close() {
 }
 
 // getShardByObjectId retrieves the appropriate shard for a given object identifier.
-func (db *db) getShardByObjectId(id string) *shard {
+func (db *DB) getShardByObjectId(id string) *shard {
 	index := hash.Local(id) % uint32(len(db.shards))
 	return db.shards[index]
 }
@@ -134,7 +116,7 @@ func (db *db) getShardByObjectId(id string) *shard {
 // shardCount retrieves the number of shards in the database. This is determined
 // by the number of numeric directories in the data path. If no directories exist
 // then a default count is used.
-func (db *db) shardCount() (int, error) {
+func (db *DB) shardCount() (int, error) {
 	infos, err := ioutil.ReadDir(db.dataPath())
 	if err != nil {
 		return 0, err
@@ -156,13 +138,13 @@ func (db *db) shardCount() (int, error) {
 }
 
 // Factorizer returns a table's factorizer.
-func (db *db) Factorizer(tablespace string) (*Factorizer, error) {
+func (db *DB) Factorizer(tablespace string) (*Factorizer, error) {
 	db.Lock()
 	defer db.Unlock()
 	return db.factorizer(tablespace)
 }
 
-func (db *db) factorizer(tablespace string) (*Factorizer, error) {
+func (db *DB) factorizer(tablespace string) (*Factorizer, error) {
 	// Retrieve already open factorizer if available.
 	if f := db.factorizers[tablespace]; f != nil {
 		return f, nil
@@ -186,7 +168,7 @@ func (db *db) factorizer(tablespace string) (*Factorizer, error) {
 }
 
 // Cursors retrieves a set of cursors for iterating over the database.
-func (db *db) Cursors(tablespace string) (Cursors, error) {
+func (db *DB) Cursors(tablespace string) (Cursors, error) {
 	cursors := make(Cursors, 0)
 	for _, s := range db.shards {
 		c, err := s.Cursor(tablespace)
@@ -199,30 +181,30 @@ func (db *db) Cursors(tablespace string) (Cursors, error) {
 	return cursors, nil
 }
 
-func (db *db) GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error) {
+func (db *DB) GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error) {
 	s := db.getShardByObjectId(id)
 	return s.GetEvent(tablespace, id, timestamp)
 }
 
-func (db *db) GetEvents(tablespace string, id string) ([]*Event, error) {
+func (db *DB) GetEvents(tablespace string, id string) ([]*Event, error) {
 	s := db.getShardByObjectId(id)
 	return s.GetEvents(tablespace, id)
 }
 
 // InsertEvent adds a single event to the database.
-func (db *db) InsertEvent(tablespace string, id string, event *Event) error {
+func (db *DB) InsertEvent(tablespace string, id string, event *Event) error {
 	s := db.getShardByObjectId(id)
 	return s.InsertEvent(tablespace, id, event)
 }
 
 // InsertEvents adds multiple events for a single object.
-func (db *db) InsertEvents(tablespace string, id string, newEvents []*Event) error {
+func (db *DB) InsertEvents(tablespace string, id string, newEvents []*Event) error {
 	s := db.getShardByObjectId(id)
 	return s.InsertEvents(tablespace, id, newEvents)
 }
 
 // InsertObjects bulk inserts events for multiple objects.
-func (db *db) InsertObjects(tablespace string, objects map[string][]*Event) (int, error) {
+func (db *DB) InsertObjects(tablespace string, objects map[string][]*Event) (int, error) {
 	count := 0
 	for id, events := range objects {
 		s := db.getShardByObjectId(id)
@@ -234,17 +216,17 @@ func (db *db) InsertObjects(tablespace string, objects map[string][]*Event) (int
 	return count, nil
 }
 
-func (db *db) DeleteEvent(tablespace string, id string, timestamp time.Time) error {
+func (db *DB) DeleteEvent(tablespace string, id string, timestamp time.Time) error {
 	s := db.getShardByObjectId(id)
 	return s.DeleteEvent(tablespace, id, timestamp)
 }
 
-func (db *db) DeleteObject(tablespace string, id string) error {
+func (db *DB) DeleteObject(tablespace string, id string) error {
 	s := db.getShardByObjectId(id)
 	return s.DeleteObject(tablespace, id)
 }
 
-func (db *db) Merge(tablespace string, destinationId string, sourceId string) error {
+func (db *DB) Merge(tablespace string, destinationId string, sourceId string) error {
 	dest := db.getShardByObjectId(destinationId)
 	src := db.getShardByObjectId(sourceId)
 
@@ -268,7 +250,7 @@ func (db *db) Merge(tablespace string, destinationId string, sourceId string) er
 }
 
 // Drop removes a table from the database.
-func (db *db) Drop(tablespace string) error {
+func (db *DB) Drop(tablespace string) error {
 	var err error
 	for _, s := range db.shards {
 		if _err := s.Drop(tablespace); err == nil {
@@ -278,7 +260,7 @@ func (db *db) Drop(tablespace string) error {
 	return err
 }
 
-func (db *db) Stats() ([]*Stat, error) {
+func (db *DB) Stats() ([]*Stat, error) {
 	stats := make([]*Stat, 0, len(db.shards))
 	for _, shard := range db.shards {
 		stat, err := shard.Stat()
