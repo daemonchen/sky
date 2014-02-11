@@ -9,4 +9,3 @@ type Event struct {
 	Timestamp time.Time
 	Data      map[int64]interface{}
 }
-

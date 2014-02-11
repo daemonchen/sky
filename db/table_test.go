@@ -32,11 +32,10 @@ func withTable(f func(*Table)) {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
-	table := &Table{Name:"test"}
+	table := &Table{Name: "test"}
 	if err := table.Open(path); err != nil {
 		panic("table open error: " + err.Error())
 	}
 
 	f(table)
 }
-

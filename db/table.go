@@ -9,15 +9,15 @@ import (
 )
 
 var (
-	TableExistsError = &Error{"table already exists", nil}
+	TableExistsError    = &Error{"table already exists", nil}
 	TableNotExistsError = &Error{"table does not exist", nil}
 )
 
 // Table is a collection of objects.
 type Table struct {
-	Name         string `json:"name"`
-	path         string
-	properties   Properties
+	Name       string `json:"name"`
+	path       string
+	properties Properties
 }
 
 // Retrieves the path on the table.

@@ -19,7 +19,7 @@ func (p Properties) Create(name string, transient bool, dataType string) (*Prope
 	}
 
 	// Create and validate property.
-	property := &Property{Name: name, Transient: transient, DataType:  dataType}
+	property := &Property{Name: name, Transient: transient, DataType: dataType}
 	if err := property.Validate(); err != nil {
 		return nil, err
 	}
@@ -96,7 +96,6 @@ func (p Properties) Decode(r io.Reader) error {
 	return nil
 }
 
-
 //--------------------------------------
 // Normalization
 //--------------------------------------
@@ -151,8 +150,8 @@ func (p Properties) nextPermanentId() int64 {
 	return id
 }
 
-
 type propertiesById []*Property
-func (s propertiesById) Len() int { return len(s) }
+
+func (s propertiesById) Len() int           { return len(s) }
 func (s propertiesById) Less(i, j int) bool { return s[i].Id < s[j].Id }
-func (s propertiesById) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s propertiesById) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

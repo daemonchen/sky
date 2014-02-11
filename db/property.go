@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	InvalidPropertyNameError = &Error{"invalid property name", nil}
+	InvalidPropertyNameError     = &Error{"invalid property name", nil}
 	InvalidPropertyDataTypeError = &Error{"invalid property data type", nil}
 )
 

@@ -68,4 +68,3 @@ func TestPropertiesDenormalizeMap(t *testing.T) {
 	assert.Equal(t, ret["salary"], 100)
 	assert.Equal(t, ret["purchaseAmount"], 12)
 }
-
