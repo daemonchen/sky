@@ -62,6 +62,37 @@ func TestServerSimpleCountQuery(t *testing.T) {
 	})
 }
 
+// Ensure that we can query the server for a count of events.
+func TestServerSimpleCountQueryWithPrefixInBody(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		setupTestProperty("foo", "fruit", true, "string")
+		setupTestProperty("foo", "num", true, "integer")
+		setupTestData(t, "foo", [][]string{
+			[]string{"a0", "2012-01-01T00:00:00Z", `{"data":{"fruit":"apple"}}`},
+			[]string{"a1", "2012-01-01T00:00:00Z", `{"data":{"fruit":"grape"}}`},
+			[]string{"a1", "2012-01-01T00:00:01Z", `{"data":{"num":12}}`},
+			[]string{"a2", "2012-01-01T00:00:00Z", `{"data":{"fruit":"orange"}}`},
+			[]string{"a3", "2012-01-01T00:00:00Z", `{"data":{"fruit":"apple"}}`},
+			[]string{"b2", "2012-01-01T00:00:00Z", `{"data":{"fruit":"orange"}}`},
+			[]string{"b3", "2012-01-01T00:00:00Z", `{"data":{"fruit":"apple"}}`},
+		})
+
+		setupTestTable("bar")
+		setupTestProperty("bar", "fruit", true, "string")
+		setupTestData(t, "bar", [][]string{
+			[]string{"a0", "2012-01-01T00:00:00Z", `{"data":{"fruit":"grape"}}`},
+		})
+
+		// Run query.
+		query := `{"query":"SELECT count()", "prefix": "a"}`
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		assertResponse(t, resp, 200, `{"count":5}`+"\n", "POST /tables/:name/query failed.")
+		resp, _ = sendTestHttpRequest("POST", "http://localhost:8586/tables/bar/query", "application/json", query)
+		assertResponse(t, resp, 200, `{"count":1}`+"\n", "POST /tables/:name/query failed.")
+	})
+}
+
 // Ensure that we can query the server for a count of events with a single dimension.
 func TestServerOneDimensionCountQuery(t *testing.T) {
 	runTestServer(func(s *Server) {
