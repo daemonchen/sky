@@ -53,7 +53,10 @@ func (s *Server) queryHandler(w http.ResponseWriter, req *http.Request, params m
 		return nil, err
 	}
 
-	q.Prefix = req.FormValue("prefix")
+	prefix := req.FormValue("prefix")
+	if prefix != "" {
+		q.Prefix = prefix
+	}
 
 	return s.RunQuery(table, q)
 }

@@ -5,6 +5,33 @@ import (
 	"testing"
 )
 
+// Ensure error when no prefix.
+func TestServerQueryFailsWithNoPrefix(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		setupTestProperty("foo", "fruit", true, "string")
+		setupTestProperty("foo", "num", true, "integer")
+		setupTestData(t, "foo", [][]string{
+			[]string{"a0", "2012-01-01T00:00:00Z", `{"data":{"fruit":"apple"}}`},
+			[]string{"a1", "2012-01-01T00:00:00Z", `{"data":{"fruit":"grape"}}`},
+			[]string{"a1", "2012-01-01T00:00:01Z", `{"data":{"num":12}}`},
+			[]string{"a2", "2012-01-01T00:00:00Z", `{"data":{"fruit":"orange"}}`},
+			[]string{"a3", "2012-01-01T00:00:00Z", `{"data":{"fruit":"apple"}}`},
+		})
+
+		setupTestTable("bar")
+		setupTestProperty("bar", "fruit", true, "string")
+		setupTestData(t, "bar", [][]string{
+			[]string{"a0", "2012-01-01T00:00:00Z", `{"data":{"fruit":"grape"}}`},
+		})
+
+		// Run query.
+		query := `{"query":{"statements":"SELECT count()"}}`
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		assertResponse(t, resp, 500, `{"message":"Prefix is required on queries."}`+"\n", "POST /tables/:name/query failed.")
+	})
+}
+
 // Ensure that we can query the server for a count of events.
 func TestServerSimpleCountQuery(t *testing.T) {
 	runTestServer(func(s *Server) {
@@ -27,9 +54,9 @@ func TestServerSimpleCountQuery(t *testing.T) {
 
 		// Run query.
 		query := `{"query":{"statements":"SELECT count()"}}`
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=a", "application/json", query)
 		assertResponse(t, resp, 200, `{"count":5}`+"\n", "POST /tables/:name/query failed.")
-		resp, _ = sendTestHttpRequest("POST", "http://localhost:8586/tables/bar/query", "application/json", query)
+		resp, _ = sendTestHttpRequest("POST", "http://localhost:8586/tables/bar/query?prefix=a", "application/json", query)
 		assertResponse(t, resp, 200, `{"count":1}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -51,7 +78,7 @@ func TestServerOneDimensionCountQuery(t *testing.T) {
 		// Run query.
 		query := `{"query":"SELECT count() AS count GROUP BY fruit"}`
 		//_codegen(t, "foo", query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=b", "application/json", query)
 		assertResponse(t, resp, 200, `{"fruit":{"":{"count":1},"apple":{"count":2},"grape":{"count":1},"orange":{"count":1}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -84,7 +111,7 @@ func TestServerMultiDimensionalQuery(t *testing.T) {
 			`SELECT count(DISTINCT price) AS distinct INTO \"_\" ` +
 			`"}`
 		//_codegen(t, "foo", query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=c", "application/json", query)
 		assertResponse(t, resp, 200, `{"_":{"average":60,"distinct":6,"sum":2720},"gender":{"f":{"state":{"NY":{"maximum":30,"minimum":30}}},"m":{"state":{"CA":{"maximum":20,"minimum":0},"NY":{"maximum":200,"minimum":100}}}},"s1":{"gender":{"f":{"state":{"NY":{"count":1,"sum":30}}},"m":{"state":{"CA":{"count":3,"sum":30},"NY":{"count":2,"sum":300}}}}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -96,21 +123,21 @@ func TestServerFunnelAnalysisQuery(t *testing.T) {
 		setupTestProperty("foo", "action", true, "factor")
 		setupTestData(t, "foo", [][]string{
 			// A0[0..0]..A1[1..2] occurs twice for this object.
-			[]string{"d0", "2012-01-01T00:00:00Z", `{"data":{"action":"A0"}}`},
-			[]string{"d0", "2012-01-01T00:00:01Z", `{"data":{"action":"A1"}}`},
-			[]string{"d0", "2012-01-01T00:00:02Z", `{"data":{"action":"A2"}}`},
-			[]string{"d0", "2012-01-01T12:00:00Z", `{"data":{"action":"A0"}}`},
-			[]string{"d0", "2012-01-01T13:00:00Z", `{"data":{"action":"A0"}}`},
-			[]string{"d0", "2012-01-01T14:00:00Z", `{"data":{"action":"A1"}}`},
+			[]string{"ad0", "2012-01-01T00:00:00Z", `{"data":{"action":"A0"}}`},
+			[]string{"ad0", "2012-01-01T00:00:01Z", `{"data":{"action":"A1"}}`},
+			[]string{"ad0", "2012-01-01T00:00:02Z", `{"data":{"action":"A2"}}`},
+			[]string{"ad0", "2012-01-01T12:00:00Z", `{"data":{"action":"A0"}}`},
+			[]string{"ad0", "2012-01-01T13:00:00Z", `{"data":{"action":"A0"}}`},
+			[]string{"ad0", "2012-01-01T14:00:00Z", `{"data":{"action":"A1"}}`},
 
 			// A0[0..0]..A1[1..2] occurs once for this object. (Second time matches A1[1..3]).
-			[]string{"e1", "2012-01-01T00:00:00Z", `{"data":{"action":"A0"}}`},
-			[]string{"e1", "2012-01-01T00:00:01Z", `{"data":{"action":"A0"}}`},
-			[]string{"e1", "2012-01-01T00:00:02Z", `{"data":{"action":"A1"}}`},
-			[]string{"e1", "2012-01-02T00:00:00Z", `{"data":{"action":"A0"}}`},
-			[]string{"e1", "2012-01-02T00:00:01Z", `{"data":{"action":"A0"}}`},
-			[]string{"e1", "2012-01-02T00:00:02Z", `{"data":{"action":"A0"}}`},
-			[]string{"e1", "2012-01-02T00:00:03Z", `{"data":{"action":"A1"}}`},
+			[]string{"ae1", "2012-01-01T00:00:00Z", `{"data":{"action":"A0"}}`},
+			[]string{"ae1", "2012-01-01T00:00:01Z", `{"data":{"action":"A0"}}`},
+			[]string{"ae1", "2012-01-01T00:00:02Z", `{"data":{"action":"A1"}}`},
+			[]string{"ae1", "2012-01-02T00:00:00Z", `{"data":{"action":"A0"}}`},
+			[]string{"ae1", "2012-01-02T00:00:01Z", `{"data":{"action":"A0"}}`},
+			[]string{"ae1", "2012-01-02T00:00:02Z", `{"data":{"action":"A0"}}`},
+			[]string{"ae1", "2012-01-02T00:00:03Z", `{"data":{"action":"A1"}}`},
 		})
 
 		// Run query.
@@ -121,7 +148,7 @@ func TestServerFunnelAnalysisQuery(t *testing.T) {
 			`  END ` +
 			`END` +
 			`"}`
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=a", "application/json", query)
 		assertResponse(t, resp, 200, `{"action":{"A1":{"count":3}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -141,7 +168,7 @@ func TestServerFactorizeOverlappingQueries(t *testing.T) {
 			`SELECT count() AS count2 GROUP BY action INTO \"q\" ` +
 			`"}`
 		//_codegen(t, "foo", query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=f", "application/json", query)
 		assertResponse(t, resp, 200, `{"q":{"action":{"A0":{"count1":1,"count2":1}}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -173,7 +200,7 @@ func TestServerSessionizedFunnelAnalysisQuery(t *testing.T) {
 			`END` +
 			`"}`
 		// _codegen(t, "foo", query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=f", "application/json", query)
 		assertResponse(t, resp, 200, `{"action":{"A1":{"count":1}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -200,7 +227,7 @@ func TestServerSystemVariables(t *testing.T) {
 			END
 		`
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=f", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"action":{"A0":{"eos":{"false":{"eof":{"false":{"count":1}}},"true":{"eof":{"false":{"count":1},"true":{"count":1}}}}},"A1":{"eos":{"true":{"eof":{"false":{"count":1},"true":{"count":1}}}}}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -226,7 +253,7 @@ func TestServerTimestampQuery(t *testing.T) {
 			`  SELECT count() AS count, sum(timestamp) AS tsSum GROUP BY action ` +
 			`END` +
 			`"}`
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", query)
 		assertResponse(t, resp, 200, `{"action":{"A1":{"count":1,"tsSum":2},"A2":{"count":1,"tsSum":4},"A5":{"count":2,"tsSum":4}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -265,7 +292,7 @@ func TestServerFSMQuery(t *testing.T) {
 			END
 		`
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"cancelled":{"count":1},"registered":{"count":1},"visited":{"count":2}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -293,7 +320,7 @@ func TestServerFactorVariableQuery(t *testing.T) {
 			SET prev_action = action
 		`
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"prev_action":{"":{"action":{"x":{"count":1},"y":{"count":1}}},"y":{"action":{"z":{"count":2}}}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -321,7 +348,7 @@ func TestServerTimeLoopQuery(t *testing.T) {
 		`
 		q, _ := json.Marshal(query)
 		// _codegen(t, "foo", `{"query":`+string(q)+`}`)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"i":{"1":{"sum_val":10},"3":{"sum_val":60},"4":{"sum_val":70}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -348,7 +375,7 @@ func TestServerHistogramQuery(t *testing.T) {
 
 		// Run query.
 		query := `{"query":"SELECT histogram(val) AS hist"}`
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", query)
 		assertResponse(t, resp, 200, `{"hist":{"__histogram__":true,"bins":{"0":3,"1":1,"2":5},"count":3,"max":4,"min":0,"width":1.3333333333333333}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -384,7 +411,7 @@ func TestServerRawQuery(t *testing.T) {
 		setupTestData(t, "foo", [][]string{
 			[]string{"x", "2012-01-01T00:00:00Z", `{"data":{"price":100}}`},
 		})
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", "SELECT count() AS count")
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=x", "application/json", "SELECT count() AS count")
 		assertResponse(t, resp, 200, `{"count":1}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -406,7 +433,7 @@ func TestServerExitQuery(t *testing.T) {
 			WHEN value == 200 || value == 10 THEN EXIT END
 		`
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"total":310}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -425,7 +452,7 @@ func TestServerDebugQuery(t *testing.T) {
 			DEBUG(timestamp)
 		`
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=x", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -453,7 +480,7 @@ func TestServerExportQuery(t *testing.T) {
 		`
 		//_codegen(t, "foo", query)
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=0", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"_":[{"my_boolean":true,"my_factor":"yyy","my_float":10.2,"my_integer":100,"my_string":"xxx","timestamp":1325376000},{"my_boolean":false,"my_factor":"","my_float":0,"my_integer":0,"my_string":"","timestamp":1325376001}],"my_integer":{"0":{"_":[{"factor2":""}],"count":1},"100":{"_":[{"factor2":"yyy"}],"count":1}},"named":{"_":[{"my_factor":"yyy"},{"my_factor":"yyy"},{"my_factor":""},{"my_factor":""}]}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
@@ -470,7 +497,7 @@ func TestServerDuplicateSelectionQuery(t *testing.T) {
 			SELECT count() AS count GROUP BY value INTO "test"
 		`
 		q, _ := json.Marshal(query)
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", `{"query":`+string(q)+`}`)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query?prefix=x", "application/json", `{"query":`+string(q)+`}`)
 		assertResponse(t, resp, 200, `{"test":{"value":{"100":{"count":1}}},"value":{"100":{"count":2}}}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
