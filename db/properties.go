@@ -2,7 +2,6 @@ package db
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 )
@@ -109,7 +108,7 @@ func (p Properties) NormalizeMap(m map[string]interface{}) (map[int64]interface{
 		if property != nil {
 			clone[property.Id] = property.Cast(v)
 		} else {
-			return nil, fmt.Errorf("Property not found: %v", k)
+			return nil, PropertyNotFoundError
 		}
 	}
 	return clone, nil
@@ -124,7 +123,7 @@ func (p Properties) DenormalizeMap(m map[int64]interface{}) (map[string]interfac
 		if property != nil {
 			clone[property.Name] = v
 		} else {
-			return nil, fmt.Errorf("property not found: %v", k)
+			return nil, PropertyNotFoundError
 		}
 	}
 	return clone, nil

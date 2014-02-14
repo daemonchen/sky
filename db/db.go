@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,17 +12,16 @@ import (
 	"github.com/skydb/sky/hash"
 )
 
-// DB represents Sky's file-back data store.
+// DB represents Sky's file-backed data store.
 type DB struct {
 	sync.RWMutex
 	NoSync     bool
 	MaxDBs     uint
 	MaxReaders uint
 
-	defaultShardCount int
-	factorizers       map[string]*Factorizer
-	path              string
-	shards            []*shard
+	factorizers map[string]*Factorizer
+	path        string
+	shards      []*shard
 }
 
 func (db *DB) Path() string {
@@ -134,10 +132,6 @@ func (db *DB) shardCount() (int, error) {
 		}
 	}
 
-	if count == 0 {
-		count = db.defaultShardCount
-	}
-
 	return count, nil
 }
 
@@ -178,7 +172,7 @@ func (db *DB) Cursors(tablespace string) (Cursors, error) {
 		c, err := s.Cursor(tablespace)
 		if err != nil {
 			cursors.Close()
-			return nil, fmt.Errorf("db cursors error: %s", err)
+			return nil, &Error{"db cursors error", err}
 		}
 		cursors = append(cursors, c)
 	}

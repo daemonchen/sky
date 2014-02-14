@@ -1,9 +1,9 @@
 package db
 
 const (
-	Factor  = "factor"
-	String  = "string"
-	Integer = "integer"
-	Float   = "float"
 	Boolean = "boolean"
+	Factor  = "factor"
+	Float   = "float"
+	Integer = "integer"
+	String  = "string"
 )

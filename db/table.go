@@ -2,18 +2,23 @@ package db
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 )
 
 var (
-	TableExistsError    = &Error{"table already exists", nil}
-	TableNotExistsError = &Error{"table does not exist", nil}
+	// TableExistsError is returned when creating a table that already exists.
+	TableExistsError = &Error{"table already exists", nil}
+
+	// TableNotFoundError is returned when accessing a table that doesn't exist.
+	TableNotFoundError = &Error{"table does not exist", nil}
+
+	// InvalidTimestampError is returned when parsing a non-RFC3339 timestamp.
+	InvalidTimestampError = &Error{"invalid timestamp", nil}
 )
 
-// Table is a collection of objects.
+// Table represents a collection of objects.
 type Table struct {
 	Name       string `json:"name"`
 	path       string
@@ -33,7 +38,7 @@ func (t *Table) propertiesPath() string {
 func (t *Table) Delete() error {
 	// Return error if the table does not exist.
 	if _, err := os.Stat(t.path); os.IsNotExist(err) {
-		return TableNotExistsError
+		return TableNotFoundError
 	}
 
 	// Close everything if it's open.
@@ -66,7 +71,7 @@ func (t *Table) Create(path string) error {
 func (t *Table) Open(path string) error {
 	// Return error if the table does not exist.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return TableNotExistsError
+		return TableNotFoundError
 	}
 
 	t.path = path
@@ -202,7 +207,7 @@ func (t *Table) DeserializeEvent(m map[string]interface{}) (*Event, error) {
 	if timestamp, ok := m["timestamp"].(string); ok {
 		ts, err := time.Parse(time.RFC3339, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse timestamp: %v", timestamp)
+			return nil, InvalidTimestampError
 		}
 		event.Timestamp = ts
 	} else {
