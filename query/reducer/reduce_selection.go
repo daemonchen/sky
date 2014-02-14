@@ -6,7 +6,7 @@ import (
 
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
+	"github.com/skydb/sky/query/hashmap"
 )
 
 func (r *Reducer) reduceSelection(node *ast.Selection, h *hashmap.Hashmap, tbl *ast.Symtable) error {

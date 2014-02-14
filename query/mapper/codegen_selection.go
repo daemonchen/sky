@@ -5,7 +5,7 @@ import (
 
 	"github.com/axw/gollvm/llvm"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
+	"github.com/skydb/sky/query/hashmap"
 )
 
 // [codegen]

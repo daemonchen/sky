@@ -1,4 +1,4 @@
-package minipack
+package mapper
 
 /*
 #include <string.h>

@@ -1,40 +1,99 @@
-package test
+package reducer_test
 
 import (
-	"encoding/json"
-	"fmt"
+"encoding/json"
 	"io/ioutil"
 	"os"
+	"testing"
 	"time"
 
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
-	"github.com/skydb/sky/query/codegen/mapper"
-	"github.com/skydb/sky/query/codegen/reducer"
+	"github.com/skydb/sky/query/hashmap"
+	"github.com/skydb/sky/query/mapper"
 	"github.com/skydb/sky/query/parser"
+	"github.com/skydb/sky/query/reducer"
+	"github.com/stretchr/testify/assert"
 )
 
+func TestReducerSelectCount(t *testing.T) {
+	query := `
+		FOR EACH EVENT
+			SELECT count()
+		END
+	`
+	result, err := runDBMapReducer(1, query, ast.VarDecls{
+		ast.NewVarDecl(8, "foo", "integer"),
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", 1, 10),
+			testevent("2000-01-01T00:00:02Z", 1, 20),
+		},
+		"bar": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", 1, 40),
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"count":3}`, mustmarshal(result))
+}
+
+func TestReducerSelectGroupBy(t *testing.T) {
+	query := `
+		FOR EACH EVENT
+			SELECT sum(integerValue) AS intsum GROUP BY action, booleanValue
+		END
+	`
+	result, err := runDBMapReducer(1, query, ast.VarDecls{
+		ast.NewVarDecl(1, "action", "factor"),
+		ast.NewVarDecl(2, "booleanValue", "boolean"),
+		ast.NewVarDecl(3, "integerValue", "integer"),
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", 1, 1, 2, true, 3, 10),   // A0/true/10
+			testevent("2000-01-01T00:00:01Z", 1, 1, 2, false, 3, 20),  // A0/false/20
+			testevent("2000-01-01T00:00:02Z", 1, 2, 2, false, 3, 100), // A1/false/100
+		},
+		"bar": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", 1, 1, 2, true, 3, 40), // A0/true/40
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"action":{"A0":{"booleanValue":{"false":{"intsum":20},"true":{"intsum":50}}},"A1":{"booleanValue":{"false":{"intsum":100}}}}}`, mustmarshal(result))
+}
+
+func TestReducerSelectInto(t *testing.T) {
+	query := `
+		FOR EACH EVENT
+			SELECT count() INTO "mycount"
+		END
+	`
+	result, err := runDBMapReducer(1, query, ast.VarDecls{
+		ast.NewVarDecl(8, "foo", "integer"),
+	}, map[string][]*db.Event{
+		"foo": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", 1, 10),
+			testevent("2000-01-01T00:00:02Z", 1, 20),
+		},
+		"bar": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", 1, 40),
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, `{"mycount":{"count":3}}`, mustmarshal(result))
+}
+
 func testevent(timestamp string, args ...interface{}) *db.Event {
-	e := &db.Event{Timestamp: musttime(timestamp)}
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		panic(err)
+	}
+	e := &db.Event{Timestamp: t}
 	e.Data = make(map[int64]interface{})
 	for i := 0; i < len(args); i += 2 {
 		key := args[i].(int)
 		e.Data[int64(key)] = args[i+1]
 	}
 	return e
-}
-
-func musttime(timestamp string) time.Time {
-	t, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
-
-func mustmap(value interface{}) map[string]interface{} {
-	return value.(map[string]interface{})
 }
 
 func mustmarshal(value interface{}) string {
@@ -45,10 +104,6 @@ func mustmarshal(value interface{}) string {
 	return string(b)
 }
 
-func debugln(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(os.Stderr, a...)
-}
-
 // Executes a query against a multiple shards and return the results.
 func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) error) error {
 	path, _ := ioutil.TempDir("", "")
@@ -56,7 +111,6 @@ func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) erro
 
 	db := &db.DB{}
 	if err := db.Open(path, shardCount); err != nil {
-		debugln("run.mapper.!")
 		return err
 	}
 	defer db.Close()
@@ -70,18 +124,6 @@ func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) erro
 		return err
 	}
 	return nil
-}
-
-// Executes a query against a given set of data and return the results.
-func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
-	var h *hashmap.Hashmap
-	err := runDBMappers(1, query, decls, objects, func(db *db.DB, results []*hashmap.Hashmap) error {
-		if len(results) > 0 {
-			h = results[0]
-		}
-		return nil
-	})
-	return h, err
 }
 
 // Executes a query against a multiple shards and return the results.

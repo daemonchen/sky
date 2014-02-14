@@ -3,8 +3,7 @@ package mapper
 import (
 	"github.com/axw/gollvm/llvm"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
-	"github.com/skydb/sky/query/codegen/minipack"
+	"github.com/skydb/sky/query/hashmap"
 )
 
 func (m *Mapper) codegenQuery(q *ast.Query) (llvm.Value, error) {
@@ -29,12 +28,12 @@ func (m *Mapper) codegenQuery(q *ast.Query) (llvm.Value, error) {
 
 	llvm.AddFunction(m.module, "printf", llvm.FunctionType(m.context.Int32Type(), []llvm.Type{}, true))
 
-	minipack.Declare_unpack_int(m.module, m.context)
-	minipack.Declare_unpack_double(m.module, m.context)
-	minipack.Declare_unpack_bool(m.module, m.context)
-	minipack.Declare_unpack_raw(m.module, m.context)
-	minipack.Declare_unpack_map(m.module, m.context)
-	minipack.Declare_sizeof_elem_and_data(m.module, m.context)
+	Declare_unpack_int(m.module, m.context)
+	Declare_unpack_double(m.module, m.context)
+	Declare_unpack_bool(m.module, m.context)
+	Declare_unpack_raw(m.module, m.context)
+	Declare_unpack_map(m.module, m.context)
+	Declare_sizeof_elem_and_data(m.module, m.context)
 
 	m.codegenCursorNextEventFunc()
 

@@ -2,7 +2,7 @@ package reducer
 
 import (
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
+	"github.com/skydb/sky/query/hashmap"
 )
 
 func (r *Reducer) reduceQuery(q *ast.Query, h *hashmap.Hashmap) error {

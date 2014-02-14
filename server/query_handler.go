@@ -6,9 +6,9 @@ import (
 
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/ast/validator"
-	"github.com/skydb/sky/query/codegen/hashmap"
-	"github.com/skydb/sky/query/codegen/mapper"
-	"github.com/skydb/sky/query/codegen/reducer"
+	"github.com/skydb/sky/query/hashmap"
+	"github.com/skydb/sky/query/mapper"
+	"github.com/skydb/sky/query/reducer"
 	"github.com/skydb/sky/query/parser"
 	//"github.com/szferi/gomdb"
 )

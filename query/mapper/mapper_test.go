@@ -1,11 +1,16 @@
-package test
+package mapper_test
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
+	"github.com/skydb/sky/query/parser"
+	"github.com/skydb/sky/query/mapper"
+	"github.com/skydb/sky/query/hashmap"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -179,3 +184,103 @@ func TestMapperSessionLoop(t *testing.T) {
 		assert.Equal(t, h.Submap(HASH_EOF).Submap(1).Submap(HASH_EOS).Submap(1).Get(HASH_COUNT), 1) // A0 eof=1 eos=1 count()
 	}
 }
+
+func testevent(timestamp string, args ...interface{}) *db.Event {
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		panic(err)
+	}
+	e := &db.Event{Timestamp: t}
+	e.Data = make(map[int64]interface{})
+	for i := 0; i < len(args); i += 2 {
+		key := args[i].(int)
+		e.Data[int64(key)] = args[i+1]
+	}
+	return e
+}
+
+// Executes a query against a multiple shards and return the results.
+func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) error) error {
+	path, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(path)
+
+	db := &db.DB{}
+	if err := db.Open(path, shardCount); err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Insert into db.
+	if _, err := db.InsertObjects("TBL", objects); err != nil {
+		return err
+	}
+
+	if err := fn(db); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Executes a query against a given set of data and return the results.
+func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
+	var h *hashmap.Hashmap
+	err := runDBMappers(1, query, decls, objects, func(db *db.DB, results []*hashmap.Hashmap) error {
+		if len(results) > 0 {
+			h = results[0]
+		}
+		return nil
+	})
+	return h, err
+}
+
+// Executes a query against a multiple shards and return the results.
+func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[string][]*db.Event, fn func(*db.DB, []*hashmap.Hashmap) error) error {
+	err := withDB(objects, shardCount, func(db *db.DB) error {
+		// Retrieve cursors.
+		cursors, err := db.Cursors("TBL")
+		if err != nil {
+			return err
+		}
+		defer cursors.Close()
+
+		// Create a query.
+		q := parser.New().MustParseString(query)
+		q.DeclaredVarDecls = append(q.DeclaredVarDecls, decls...)
+		q.Finalize()
+
+		// Setup factor test data.
+		f, err := db.Factorizer("TBL")
+		if err != nil {
+			return err
+		}
+		f.Factorize("action", "A0", true)
+		f.Factorize("action", "A1", true)
+		f.Factorize("factorVariable", "XXX", true)
+		f.Factorize("factorVariable", "YYY", true)
+
+		// Create a mapper generated from the query.
+		m, err := mapper.New(q, f)
+		if err != nil {
+			return err
+		}
+		// m.Dump()
+
+		// Execute the mappers.
+		results := make([]*hashmap.Hashmap, 0)
+		for _, cursor := range cursors {
+			result := hashmap.New()
+			if err = m.Map(cursor, "", result); err != nil {
+				return err
+			}
+			results = append(results, result)
+		}
+
+		if err := fn(db, results); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return err
+}
+

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
+	"github.com/skydb/sky/query/hashmap"
 )
 
 // reduceStatement executes the reducer for a single statement.

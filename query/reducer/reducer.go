@@ -2,7 +2,7 @@ package reducer
 
 import (
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/codegen/hashmap"
+	"github.com/skydb/sky/query/hashmap"
 )
 
 // Reducer takes the results of multiple mapper executions and combines
