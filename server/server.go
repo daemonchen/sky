@@ -88,7 +88,7 @@ func NewServer(port uint, path string) *Server {
 		NoSync:               false,
 		MaxDBs:               4096,
 		MaxReaders:           126,
-		StreamFlushPeriod:    60 * 1000, // milliseconds
+		StreamFlushPeriod:    60, // seconds
 		StreamFlushThreshold: 1000,
 	}
 

@@ -17,8 +17,8 @@ const (
 	DefaultPidPath              = "/var/run/skyd.pid"
 	DefaultNoSync               = false
 	DefaultMaxDBs               = 4096
-	DefaultMaxReaders           = 126       // lmdb's default
-	DefaultStreamFlushPeriod    = 60 * 1000 // milliseconds
+	DefaultMaxReaders           = 126 // lmdb's default
+	DefaultStreamFlushPeriod    = 60  // seconds
 	DefaultStreamFlushThreshold = 1000
 )
 

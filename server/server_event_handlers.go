@@ -6,8 +6,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/skydb/sky/core"
 	"io"
-	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -178,14 +178,39 @@ func (s *Server) flushTableEvents(table *core.Table, objects objectEvents) (int,
 	if err != nil {
 		return count, fmt.Errorf("Cannot put event: %v", err)
 	}
-	log.Printf("Flushed %v events!", count)
 	return count, nil
 }
 
-// PATCH /tables/:name/events
+// PATCH /tables/:name/events and /events
 func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	t0 := time.Now()
+
+	// Check for flush period/timeout passed as URL params.
+	flushPeriod := s.StreamFlushPeriod
+	if rawFlushPeriod := req.FormValue("flush-period"); rawFlushPeriod != "" {
+		period, err := strconv.Atoi(rawFlushPeriod)
+		if err == nil {
+			flushPeriod = uint(period)
+		} else {
+			s.logger.Printf("ERR: invalid flush-period parameter: %v", err)
+			fmt.Fprintf(w, `{"message":"invalid flush-period parameter: %v"}`, err)
+			return
+		}
+	}
+
+	// Check for flush threshold/buffer passed as URL params.
+	flushThreshold := s.StreamFlushThreshold
+	if rawFlushThreshold := req.FormValue("flush-threshold"); rawFlushThreshold != "" {
+		threshold, err := strconv.Atoi(rawFlushThreshold)
+		if err == nil {
+			flushThreshold = uint(threshold)
+		} else {
+			s.logger.Printf("ERR: invalid flush-period parameter: %v", err)
+			fmt.Fprintf(w, `{"message":"invalid flush-threshold parameter: %v"}`, err)
+			return
+		}
+	}
 
 	var table *core.Table
 	tableName := vars["name"]
@@ -201,9 +226,9 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 	}
 
 	tableObjects := make(map[*core.Table]objectEvents)
-	tableEventsCount := make(map[*core.Table]uint)
+	flushEventCount := uint(0)
 
-	events_written := 0
+	eventsWritten := 0
 	err := func() error {
 		// Stream in JSON event objects.
 		decoder := json.NewDecoder(req.Body)
@@ -225,10 +250,9 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 			}
 		}(decoder)
 
-		flushTimer := time.NewTimer(time.Duration(s.StreamFlushPeriod) * time.Millisecond)
-
 	loop:
 		for {
+			flushTimer := time.NewTimer(time.Duration(flushPeriod) * time.Second)
 
 			// Read in a JSON object.
 			rawEvent := map[string]interface{}{}
@@ -244,18 +268,16 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 				return err
 
 			case <-flushTimer.C:
-				// Flush ALL events.
+				// Flush period/timeout exceeded, flush all events.
 				for table, events := range tableObjects {
-					log.Printf("Streaming flush period exceeding, flushing...")
 					count, err := s.flushTableEvents(table, events)
 					if err != nil {
 						return err
 					}
-					events_written += count
+					eventsWritten += count
 				}
-				// TODO: Should we reslice the slices to 0 length instead?
 				tableObjects = make(map[*core.Table]objectEvents)
-				tableEventsCount = make(map[*core.Table]uint)
+				flushEventCount = 0
 				continue loop
 			}
 
@@ -298,25 +320,21 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 
 			if _, ok := tableObjects[eventTable]; !ok {
 				tableObjects[eventTable] = make(objectEvents)
-				tableEventsCount[eventTable] = 0
 			}
 
 			// Add event to table buffer.
 			tableObjects[eventTable][objectId] = append(tableObjects[eventTable][objectId], event)
-			tableEventsCount[eventTable] += 1
+			flushEventCount++
 
 			// Flush events if exceeding threshold.
-			if tableEventsCount[eventTable] >= s.StreamFlushThreshold {
-				log.Printf("Event count %v exceeded threshold of %v, flushing...", tableEventsCount[eventTable], s.StreamFlushThreshold)
+			if flushEventCount >= flushThreshold {
 				count, err := s.flushTableEvents(eventTable, tableObjects[eventTable])
 				if err != nil {
 					return err
 				}
-				events_written += count
+				eventsWritten += count
 
-				// TODO: optimize this by reusing slice
 				delete(tableObjects, eventTable)
-				delete(tableEventsCount, eventTable)
 			}
 
 		}
@@ -327,12 +345,11 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 	if err == nil {
 		err = func() error {
 			for table, objects := range tableObjects {
-				log.Printf("Streaming connection closing, flushing events...")
 				count, err := s.flushTableEvents(table, objects)
 				if err != nil {
 					return err
 				}
-				events_written += count
+				eventsWritten += count
 			}
 			return nil
 		}()
@@ -345,8 +362,9 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	fmt.Fprintf(w, `{"events_written":%v}`, events_written)
-	s.logger.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, events_written, time.Since(t0).Seconds())
+	fmt.Fprintf(w, `{"events_written":%v}`, eventsWritten)
+
+	s.logger.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, eventsWritten, time.Since(t0).Seconds())
 }
 
 // DELETE /tables/:name/objects/:objectId/events/:timestamp
