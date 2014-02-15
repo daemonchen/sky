@@ -358,7 +358,7 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 	if err != nil {
 		s.logger.Printf("ERR %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"message":"%v", "events_written":%v}`, err, events_written)
+		fmt.Fprintf(w, `{"message":"%v", "events_written":%v}`, err, eventsWritten)
 		return
 	}
 
