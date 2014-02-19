@@ -15,16 +15,16 @@ import (
 	"unsafe"
 )
 
-func mdbGet2(cursor *mdb.Cursor, set_key []byte, set_val []byte, op uint) (key, val []byte, err error) {
+func mdbGet2(cursor *mdb.Cursor, setKey []byte, setVal []byte, op uint) (key, val []byte, err error) {
 	var ckey C.MDB_val
 	var cval C.MDB_val
-	if set_key != nil && (op == mdb.GET_BOTH || op == mdb.GET_RANGE || op == mdb.SET || op == mdb.SET_KEY || op == mdb.SET_RANGE) {
-		ckey.mv_size = C.size_t(len(set_key))
-		ckey.mv_data = unsafe.Pointer(&set_key[0])
+	if setKey != nil && (op == mdb.GET_BOTH || op == mdb.GET_RANGE || op == mdb.SET || op == mdb.SET_KEY || op == mdb.SET_RANGE) {
+		ckey.mv_size = C.size_t(len(setKey))
+		ckey.mv_data = unsafe.Pointer(&setKey[0])
 	}
-	if set_val != nil && (op == mdb.GET_BOTH || op == mdb.GET_RANGE) {
-		cval.mv_size = C.size_t(len(set_val))
-		cval.mv_data = unsafe.Pointer(&set_val[0])
+	if setVal != nil && (op == mdb.GET_BOTH || op == mdb.GET_RANGE) {
+		cval.mv_size = C.size_t(len(setVal))
+		cval.mv_data = unsafe.Pointer(&setVal[0])
 	}
 	ret := C.mdb_cursor_get(cursor.MdbCursor(), &ckey, &cval, C.MDB_cursor_op(op))
 	if ret != mdb.SUCCESS {

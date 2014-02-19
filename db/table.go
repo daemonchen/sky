@@ -1,274 +1,388 @@
 package db
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"os"
-	"path/filepath"
+	"runtime"
+	"sync"
 	"time"
-)
 
-var (
-	// TableExistsError is returned when creating a table that already exists.
-	TableExistsError = &Error{"table already exists", nil}
-
-	// TableNotFoundError is returned when accessing a table that doesn't exist.
-	TableNotFoundError = &Error{"table does not exist", nil}
-
-	// InvalidTimestampError is returned when parsing a non-RFC3339 timestamp.
-	InvalidTimestampError = &Error{"invalid timestamp", nil}
+	"github.com/szferi/gomdb"
 )
 
 // Table represents a collection of objects.
 type Table struct {
-	Name       string `json:"name"`
+	sync.RWMutex
+
+	db         *DB
+	name       string
 	path       string
-	properties Properties
+	properties map[string]*Property
+	env        *mdb.Env
+
+	shardCount     int
+	maxPermanentID int
+	maxTransientID int
+
+	noSync     bool
+	maxDBs     uint
+	maxReaders uint
 }
 
-// Retrieves the path on the table.
+// Name returns the name of the table.
+func (t *Table) Name() string {
+	return t.name
+}
+
+// Path returns the location of the table on disk.
 func (t *Table) Path() string {
 	return t.path
 }
 
-func (t *Table) propertiesPath() string {
-	return filepath.Join(t.path, "properties")
+// Exists returns whether the table exists.
+func (t *Table) Exists() bool {
+	_, err := os.Stat(t.path)
+	return !os.IsNotExist(err)
 }
 
-// Deletes a table.
-func (t *Table) Delete() error {
-	// Return error if the table does not exist.
-	if _, err := os.Stat(t.path); os.IsNotExist(err) {
-		return TableNotFoundError
-	}
+func (t *Table) create() error {
+	t.Lock()
+	defer t.Unlock()
 
-	// Close everything if it's open.
-	if t.IsOpen() {
-		t.Close()
-	}
-
-	// Delete the whole damn directory.
-	os.RemoveAll(t.path)
-
-	return nil
-}
-
-// Create initializes a new table and opens it.
-func (t *Table) Create(path string) error {
-	// Return error if the table already exists.
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return TableExistsError
-	}
-
-	// Create root directory.
-	if err := os.MkdirAll(path, 0700); err != nil {
+	// Create directory.
+	if err := os.MkdirAll(t.path, 0700); err != nil {
 		return err
 	}
 
-	return t.Open(path)
-}
-
-// Open opens and initializes the table.
-func (t *Table) Open(path string) error {
-	// Return error if the table does not exist.
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return TableNotFoundError
+	// Set initial shard count.
+	if t.shardCount == 0 {
+		t.shardCount = runtime.NumCPU()
 	}
 
-	t.path = path
+	// Open the table.
+	if err := t._open(); err != nil {
+		return err
+	}
 
-	// Read properties file.
-	t.properties = make(Properties)
-	if _, err := os.Stat(t.propertiesPath()); !os.IsNotExist(err) {
-		f, err := os.Open(t.propertiesPath())
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		// Decode into a properties collection.
-		if err := t.properties.Decode(f); err != nil {
-			return err
-		}
+	// Save initial table state.
+	if err := t.save(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// Closes the table.
-func (t *Table) Close() {
-	t.properties = nil
+// open opens and initializes the table.
+func (t *Table) open() error {
+	t.Lock()
+	defer t.Unlock()
+	return t._open()
 }
 
-// Checks if the table is currently open.
-func (t *Table) IsOpen() bool {
-	return t.properties != nil
-}
-
-// Retrieves a reference to the current property file.
-func (t *Table) Properties() Properties {
-	return t.properties
-}
-
-// Adds a property to the table.
-func (t *Table) CreateProperty(name string, transient bool, dataType string) (*Property, error) {
-	if !t.IsOpen() {
-		return nil, errors.New("Table is not open")
+func (t *Table) _open() error {
+	if t.env != nil {
+		return nil
+	} else if !t.Exists() {
+		return ErrTableNotFound
 	}
 
-	// Create property on property file.
-	property, err := t.properties.Create(name, transient, dataType)
+	// Initialize directory.
+	if err := os.MkdirAll(t.path, 0700); err != nil {
+		return err
+	}
+
+	// Create LMDB environment.
+	env, err := mdb.NewEnv()
+	assert(err == nil, "table env error: %v", err)
+
+	// LMDB environment settings.
+	err = env.SetMaxDBs(mdb.DBI(t.maxDBs))
+	assert(err == nil, "max dbs (%d) error: %s", t.maxDBs, err)
+	err = env.SetMaxReaders(t.maxReaders)
+	assert(err == nil, "max readers (%d) error: %s", t.maxReaders, err)
+	err = env.SetMapSize(1 << 34)
+	assert(err == nil, "map size error: %s", err)
+
+	// Set LMDB flags.
+	options := uint(mdb.NOTLS)
+	if t.noSync {
+		options |= mdb.NOSYNC
+	}
+
+	// Open the LMDB environment.
+	if err := env.Open(t.path, options, 0600); err != nil {
+		env.Close()
+		return &Error{"table open error", err}
+	}
+	t.env = env
+
+	// Create standard tables.
+	err = t.txn(0, func(txn *transaction) error {
+		err := txn.dbi("meta", 0)
+		assert(err == nil, "meta dbi error: %v", err)
+
+		// Initialize shards.
+		for i := 0; i < t.shardCount; i++ {
+			err := txn.dbi(fmt.Sprintf("shard.%d", i), mdb.DUPSORT)
+			assert(err == nil, "shard dbi error: %v", err)
+		}
+		return nil
+	})
 	if err != nil {
+		return err
+	}
+
+	// Load the metadata.
+	if err := t.load(); err != nil {
+		t._close()
+		return err
+	}
+
+	return nil
+}
+
+// drop closes and removes the table.
+func (t *Table) drop() error {
+	t.Lock()
+	defer t.Unlock()
+
+	// Close table and delete everything.
+	t._close()
+	if err := os.RemoveAll(t.path); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// opened returned whether the table is currently open.
+func (t *Table) opened() bool {
+	return t.env != nil
+}
+
+func (t *Table) close() {
+	t.Lock()
+	defer t.Unlock()
+	t._close()
+}
+
+func (t *Table) _close() {
+	if t.env != nil {
+		t.env.Close()
+		t.env = nil
+	}
+}
+
+func (t *Table) load() error {
+	return t.txn(mdb.RDONLY, func(txn *transaction) error {
+		value, err := txn.get("meta", []byte("meta"))
+		if err != nil {
+			return &Error{"table meta error", err}
+		} else if len(value) == 0 {
+			return nil
+		}
+		warnf("unmarshal: %s", string(value))
+		if err := t.unmarshal(value); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (t *Table) save() error {
+	return t.txn(0, func(txn *transaction) error {
+		value, err := t.marshal()
+		warnf("marshal: %s", string(value))
+		assert(err == nil, "table marshal error: %v", err)
+		return txn.put("meta", []byte("meta"), value)
+	})
+}
+
+// Properties retrieves a map of properties by property name.
+func (t *Table) Properties() (map[string]*Property, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+	return t.properties, nil
+}
+
+// Property returns a single property from the table with the given name.
+func (t *Table) Property(name string) (*Property, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+	return t.properties[name], nil
+}
+
+// PropertyByID returns a single property from the table by id.
+func (t *Table) PropertyByID(id int) (*Property, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+	for _, p := range t.properties {
+		if p.ID == id {
+			return p, nil
+		}
+	}
+	return nil, nil
+}
+
+// CreateProperty creates a new property on the table.
+func (t *Table) CreateProperty(name string, dataType string, transient bool) (*Property, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+
+	// Don't allow duplicate names.
+	if t.properties[name] != nil {
+		return nil, ErrPropertyExists
+	}
+
+	// Create and validate property.
+	p := &Property{
+		Name:      name,
+		Transient: transient,
+		DataType:  dataType,
+	}
+	if err := p.Validate(); err != nil {
 		return nil, err
 	}
 
-	// Save table.
+	// Retrieve the next property id.
+	if transient {
+		t.maxTransientID--
+		p.ID = t.maxTransientID
+	} else {
+		t.maxPermanentID++
+		p.ID = t.maxPermanentID
+	}
+
+	// Add it to the collection.
+	t.copyProperties()
+	t.properties[name] = p
+
 	if err := t.save(); err != nil {
 		return nil, err
 	}
 
-	return property, nil
+	return p, nil
 }
 
 // RenameProperty updates the name of a property.
 func (t *Table) RenameProperty(oldName, newName string) (*Property, error) {
-	t.properties.Rename(oldName, newName)
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	} else if t.properties[oldName] == nil {
+		return nil, ErrPropertyNotFound
+	} else if t.properties[newName] != nil {
+		return nil, ErrPropertyExists
+	}
+
+	t.copyProperties()
+	p := t.properties[oldName].Clone()
+	p.Name = newName
+	delete(t.properties, oldName)
+	t.properties[newName] = p
 
 	if err := t.save(); err != nil {
 		return nil, err
 	}
-
-	return t.properties.FindByName(newName), nil
+	return p, nil
 }
 
-// Retrieves a list of all properties on the table.
-func (t *Table) GetProperties() ([]*Property, error) {
-	if !t.IsOpen() {
-		return nil, errors.New("Table is not open")
+// DeleteProperty removes a single property from the table.
+func (t *Table) DeleteProperty(name string) error {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return ErrTableNotOpen
+	} else if t.properties[name] == nil {
+		return ErrPropertyNotFound
 	}
-	return t.properties.Slice(), nil
-}
-
-// Retrieves a single property from the table by id.
-func (t *Table) GetProperty(id int64) (*Property, error) {
-	if !t.IsOpen() {
-		return nil, errors.New("Table is not open")
-	}
-	return t.properties.FindById(id), nil
-}
-
-// Retrieves a single property from the table by name.
-func (t *Table) GetPropertyByName(name string) (*Property, error) {
-	if !t.IsOpen() {
-		return nil, errors.New("Table is not open")
-	}
-	return t.properties.FindByName(name), nil
-}
-
-// Deletes a single property on the table.
-func (t *Table) DeleteProperty(property *Property) error {
-	if !t.IsOpen() {
-		return errors.New("Table is not open")
-	}
-	t.properties.Delete(property.Name)
+	delete(t.properties, name)
 	return t.save()
 }
 
-// Save writes the table to disk.
-func (t *Table) Save() error {
-	return t.save()
+// copyProperties creates a new map and copies all existing properties.
+func (t *Table) copyProperties() {
+	properties := make(map[string]*Property)
+	for k, v := range t.properties {
+		properties[k] = v
+	}
+	t.properties = properties
 }
 
-func (t *Table) save() error {
-	f, err := os.Create(t.propertiesPath())
-	if err != nil {
+// marshal encodes the table into a byte slice.
+func (t *Table) marshal() ([]byte, error) {
+	var msg = tableRawMessage{Name: t.name, ShardCount: t.shardCount, MaxPermanentID: t.maxPermanentID, MaxTransientID: t.maxTransientID}
+	for _, p := range t.properties {
+		msg.Properties = append(msg.Properties, p)
+	}
+	return json.Marshal(msg)
+}
+
+// unmarshal decodes a byte slice into a table.
+func (t *Table) unmarshal(data []byte) error {
+	var msg tableRawMessage
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return err
 	}
-	defer f.Close()
-	return t.properties.Encode(f)
-}
+	t.name = msg.Name
+	t.maxPermanentID = msg.MaxPermanentID
+	t.maxTransientID = msg.MaxTransientID
+	t.shardCount = msg.ShardCount
 
-// Converts a map with string keys to use property identifier keys.
-func (t *Table) NormalizeMap(m map[string]interface{}) (map[int64]interface{}, error) {
-	// TODO(benbjohnson): Move normalization to table-only.
-	return t.properties.NormalizeMap(m)
-}
-
-// Converts a map with property identifier keys to use string keys.
-func (t *Table) DenormalizeMap(m map[int64]interface{}) (map[string]interface{}, error) {
-	// TODO(benbjohnson): Move denormalization to table-only.
-	return t.properties.DenormalizeMap(m)
-}
-
-// Deserializes a map into a normalized event.
-func (t *Table) DeserializeEvent(m map[string]interface{}) (*Event, error) {
-	event := &Event{}
-
-	// Parse timestamp.
-	if timestamp, ok := m["timestamp"].(string); ok {
-		ts, err := time.Parse(time.RFC3339, timestamp)
-		if err != nil {
-			return nil, InvalidTimestampError
-		}
-		event.Timestamp = ts
-	} else {
-		return nil, errors.New("Timestamp required.")
+	t.properties = make(map[string]*Property)
+	for _, p := range msg.Properties {
+		t.properties[p.Name] = p
 	}
 
-	// Convert maps to use property identifiers.
-	if data, ok := m["data"].(map[string]interface{}); ok {
-		normalizedData, err := t.NormalizeMap(data)
-		if err != nil {
-			return nil, err
-		}
-		event.Data = normalizedData
-	}
-
-	return event, nil
+	return nil
 }
 
-// DeserializeEvents converts denormalized key/value maps into a slice of normalized events.
-func (t *Table) DeserializeEvents(items []map[string]interface{}) ([]*Event, error) {
-	events := make([]*Event, 0)
-	for _, item := range items {
-		event, err := t.DeserializeEvent(item)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
+// txn executes a function within the context of a LMDB transaction.
+func (t *Table) txn(flags uint, fn func(*transaction) error) error {
+	txn, err := t.env.BeginTxn(nil, flags)
+	if err != nil {
+		return &Error{"txn error", err}
 	}
-	return events, nil
+	if err := fn(&transaction{txn}); err != nil {
+		txn.Abort()
+		return err
+	}
+	if err := txn.Commit(); err != nil {
+		return &Error{"txn commit error", err}
+	}
+	return nil
 }
 
-// SerializeEvent converts a normalized event into a key/value map.
-func (t *Table) SerializeEvent(event *Event) (map[string]interface{}, error) {
-	m := make(map[string]interface{})
-
-	// Format timestamp.
-	m["timestamp"] = event.Timestamp.UTC().Format(time.RFC3339Nano)
-
-	// Convert data map to use property names.
-	if event.Data != nil {
-		denormalizedData, err := t.DenormalizeMap(event.Data)
-		if err != nil {
-			return nil, err
-		}
-		m["data"] = denormalizedData
-	} else {
-		m["data"] = map[string]interface{}{}
-	}
-
-	return m, nil
+type tableRawMessage struct {
+	Name           string      `json:"name"`
+	ShardCount     int         `json:"shardCount"`
+	MaxPermanentID int         `json:"maxPermanentID"`
+	MaxTransientID int         `json:"maxTransientID"`
+	Properties     []*Property `json:"properties"`
 }
 
-// SerializeEvents converts normalized events into a slice of key/value maps.
-func (t *Table) SerializeEvents(events []*Event) ([]map[string]interface{}, error) {
-	output := make([]map[string]interface{}, 0)
-	for _, event := range events {
-		item, err := t.SerializeEvent(event)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, item)
-	}
-	return output, nil
+// Event represents the state for an object at a given point in time.
+type Event struct {
+	Timestamp time.Time
+	Data      map[string]interface{}
+}
+
+// rawEvent represents an internal event.
+type rawEvent struct {
+	Timestamp int64
+	Data      map[int64]interface{}
 }

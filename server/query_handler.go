@@ -8,8 +8,8 @@ import (
 	"github.com/skydb/sky/query/ast/validator"
 	"github.com/skydb/sky/query/hashmap"
 	"github.com/skydb/sky/query/mapper"
-	"github.com/skydb/sky/query/reducer"
 	"github.com/skydb/sky/query/parser"
+	"github.com/skydb/sky/query/reducer"
 	//"github.com/szferi/gomdb"
 )
 

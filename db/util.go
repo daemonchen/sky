@@ -1,5 +1,18 @@
 package db
 
+import (
+	"fmt"
+	"os"
+)
+
+func warn(v ...interface{}) {
+	fmt.Fprintln(os.Stderr, v...)
+}
+
+func warnf(msg string, v ...interface{}) {
+	fmt.Fprintf(os.Stderr, msg+"\n", v...)
+}
+
 // promote casts integer types to int64, floats to float64 and returns other types unchanged.
 func promote(v interface{}) interface{} {
 	switch v := v.(type) {

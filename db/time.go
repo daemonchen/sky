@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+var (
+	// ErrInvalidTimestamp is returned when parsing a non-RFC3339 timestamp.
+	ErrInvalidTimestamp = &Error{"invalid timestamp", nil}
+)
+
+// SecondsBitOffset is the number of bits used to store subseconds in Sky time.
 const SecondsBitOffset = 20
 
 // shiftTime converts Go time into a Sky timestamp.

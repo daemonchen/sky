@@ -1,15 +1,17 @@
 package db
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"sync"
-	"time"
+)
 
-	"github.com/skydb/sky/hash"
+const (
+	// DefaultMaxDBs is the default limit of databases Sky can use.
+	DefaultMaxDBs = uint(1024)
+
+	// DefaultMaxReaders is the default limit of readers that Sky can use.
+	DefaultMaxReaders = uint(126)
 )
 
 // DB represents Sky's file-backed data store.
@@ -19,74 +21,43 @@ type DB struct {
 	MaxDBs     uint
 	MaxReaders uint
 
-	factorizers map[string]*Factorizer
-	path        string
-	shards      []*shard
+	tables map[string]*Table
+	path   string
 }
 
+// Path returns the root path of the database.
 func (db *DB) Path() string {
 	return db.path
 }
 
-func (db *DB) dataPath() string {
-	return filepath.Join(db.path, "data")
+// tablePath returns the path of a named table.
+func (db *DB) tablePath(name string) string {
+	return filepath.Join(db.path, name)
 }
 
-func (db *DB) factorsPath() string {
-	return filepath.Join(db.path, "factors")
-}
-
-func (db *DB) shardPath(index int) string {
-	return filepath.Join(db.dataPath(), strconv.Itoa(index))
-}
-
-// Opens the database.
-func (db *DB) Open(path string, shardCount int) error {
+// Open opens and initializes the database.
+func (db *DB) Open(path string) error {
 	db.Lock()
 	defer db.Unlock()
 
+	// Return an error if the database is currently opened.
+	if db.path != "" {
+		return ErrDatabaseOpen
+	}
+
 	// Initialize poperties.
 	db.path = path
-	db.factorizers = make(map[string]*Factorizer)
+	db.tables = make(map[string]*Table)
 
 	// Create directory if it doesn't exist.
-	if err := os.MkdirAll(db.dataPath(), 0700); err != nil {
+	if err := os.MkdirAll(db.path, 0700); err != nil {
 		return err
-	}
-	if err := os.MkdirAll(db.factorsPath(), 0700); err != nil {
-		return err
-	}
-
-	// If database already exists then use the existing number of shards.
-	n, err := db.shardCount()
-	if err != nil {
-		return err
-	} else if n > 0 {
-		shardCount = n
-	} else if shardCount == 0 {
-		shardCount = runtime.NumCPU()
-	}
-
-	// Create and open each shard.
-	db.shards = make([]*shard, 0)
-	for i := 0; i < shardCount; i++ {
-		shard := &shard{
-			maxDBs:     db.MaxDBs,
-			maxReaders: db.MaxReaders,
-			noSync:     db.NoSync,
-		}
-
-		db.shards = append(db.shards, shard)
-		if err := shard.Open(db.shardPath(i)); err != nil {
-			db.close()
-			return err
-		}
 	}
 
 	return nil
 }
 
-// Close shuts down all open database resources.
+// Close closes all tables.
 func (db *DB) Close() {
 	db.Lock()
 	defer db.Unlock()
@@ -94,178 +65,109 @@ func (db *DB) Close() {
 }
 
 func (db *DB) close() {
-	// Close factorizers.
-	for _, f := range db.factorizers {
-		f.Close()
+	for _, t := range db.tables {
+		t.close()
 	}
-	db.factorizers = nil
-
-	// Close shards.
-	for _, s := range db.shards {
-		s.Close()
-	}
-	db.shards = nil
-
+	db.tables = nil
 	db.path = ""
 }
 
-// getShardByObjectId retrieves the appropriate shard for a given object identifier.
-func (db *DB) getShardByObjectId(id string) *shard {
-	index := hash.Local(id) % uint32(len(db.shards))
-	return db.shards[index]
-}
-
-// shardCount retrieves the number of shards in the database. This is determined
-// by the number of numeric directories in the data path. If no directories exist
-// then a default count is used.
-func (db *DB) shardCount() (int, error) {
-	infos, err := ioutil.ReadDir(db.dataPath())
-	if err != nil {
-		return 0, err
-	}
-
-	count := 0
-	for _, info := range infos {
-		index, err := strconv.Atoi(info.Name())
-		if info.IsDir() && err == nil && (index+1) > count {
-			count = index + 1
-		}
-	}
-
-	return count, nil
-}
-
-// Factorizer returns a table's factorizer.
-func (db *DB) Factorizer(tablespace string) (*Factorizer, error) {
+// CreateTable creates, opens and initializes a table.
+// Returns an error if the table already exists.
+func (db *DB) CreateTable(name string) (*Table, error) {
 	db.Lock()
 	defer db.Unlock()
-	return db.factorizer(tablespace)
-}
 
-func (db *DB) factorizer(tablespace string) (*Factorizer, error) {
-	// Retrieve already open factorizer if available.
-	if f := db.factorizers[tablespace]; f != nil {
-		return f, nil
-	}
-
-	// Otherwise create a new factorizer for the table.
-	f := NewFactorizer()
-	f.NoSync = db.NoSync
-	f.MaxDBs = db.MaxDBs
-	f.MaxReaders = db.MaxReaders
-
-	path := filepath.Join(db.factorsPath(), tablespace)
-	if err := f.Open(path); err != nil {
+	if _, err := db.openTable(name); err == nil {
+		return nil, ErrTableExists
+	} else if err != ErrTableNotFound {
 		return nil, err
 	}
 
-	// Save the open factorizer to the lookup.
-	db.factorizers[tablespace] = f
-
-	return f, nil
-}
-
-// Cursors retrieves a set of cursors for iterating over the database.
-func (db *DB) Cursors(tablespace string) (Cursors, error) {
-	cursors := make(Cursors, 0)
-	for _, s := range db.shards {
-		c, err := s.Cursor(tablespace)
-		if err != nil {
-			cursors.Close()
-			return nil, &Error{"db cursors error", err}
-		}
-		cursors = append(cursors, c)
+	// Create table.
+	t := db.table(name)
+	if err := t.create(); err != nil {
+		return nil, err
 	}
-	return cursors, nil
+
+	// Return opened table.
+	return db.openTable(name)
 }
 
-func (db *DB) GetEvent(tablespace string, id string, timestamp time.Time) (*Event, error) {
-	s := db.getShardByObjectId(id)
-	return s.GetEvent(tablespace, id, timestamp)
-}
-
-func (db *DB) GetEvents(tablespace string, id string) ([]*Event, error) {
-	s := db.getShardByObjectId(id)
-	return s.GetEvents(tablespace, id)
-}
-
-// InsertEvent adds a single event to the database.
-func (db *DB) InsertEvent(tablespace string, id string, event *Event) error {
-	s := db.getShardByObjectId(id)
-	return s.InsertEvent(tablespace, id, event)
-}
-
-// InsertEvents adds multiple events for a single object.
-func (db *DB) InsertEvents(tablespace string, id string, newEvents []*Event) error {
-	s := db.getShardByObjectId(id)
-	return s.InsertEvents(tablespace, id, newEvents)
-}
-
-// InsertObjects bulk inserts events for multiple objects.
-func (db *DB) InsertObjects(tablespace string, objects map[string][]*Event) (int, error) {
-	count := 0
-	for id, events := range objects {
-		s := db.getShardByObjectId(id)
-		if err := s.InsertEvents(tablespace, id, events); err != nil {
-			return count, err
-		}
-		count += len(events)
+// DropTable closes and removes a table from the database.
+// Returns an error if the database does not exist.
+func (db *DB) DropTable(name string) error {
+	db.Lock()
+	defer db.Unlock()
+	if db.path == "" {
+		return ErrDatabaseNotOpen
 	}
-	return count, nil
-}
 
-func (db *DB) DeleteEvent(tablespace string, id string, timestamp time.Time) error {
-	s := db.getShardByObjectId(id)
-	return s.DeleteEvent(tablespace, id, timestamp)
-}
+	// Find the table.
+	t := db.table(name)
+	if !t.Exists() {
+		return ErrTableNotFound
+	}
 
-func (db *DB) DeleteObject(tablespace string, id string) error {
-	s := db.getShardByObjectId(id)
-	return s.DeleteObject(tablespace, id)
-}
-
-func (db *DB) Merge(tablespace string, destinationId string, sourceId string) error {
-	dest := db.getShardByObjectId(destinationId)
-	src := db.getShardByObjectId(sourceId)
-
-	// Retrieve source events.
-	srcEvents, err := src.GetEvents(tablespace, sourceId)
-	if err != nil {
+	// Drop table and remove it from the cache.
+	if err := t.drop(); err != nil {
 		return err
 	}
-
-	// Insert events into destination object.
-	if len(srcEvents) > 0 {
-		if err = dest.InsertEvents(tablespace, destinationId, srcEvents); err != nil {
-			return err
-		}
-		if err = src.DeleteObject(tablespace, sourceId); err != nil {
-			return err
-		}
-	}
+	delete(db.tables, name)
 
 	return nil
 }
 
-// Drop removes a table from the database.
-func (db *DB) Drop(tablespace string) error {
-	var err error
-	for _, s := range db.shards {
-		if _err := s.Drop(tablespace); err == nil {
-			err = _err
-		}
-	}
-	return err
+// OpenTable opens and initializes a table.
+// Returns an error if the table does not exist.
+func (db *DB) OpenTable(name string) (*Table, error) {
+	db.Lock()
+	defer db.Unlock()
+	return db.openTable(name)
 }
 
-func (db *DB) Stats() ([]*Stat, error) {
-	stats := make([]*Stat, 0, len(db.shards))
-	for _, shard := range db.shards {
-		stat, err := shard.Stat()
-		if err != nil {
-			return stats, err
-		}
-		stats = append(stats, stat)
+func (db *DB) openTable(name string) (*Table, error) {
+	if db.path == "" {
+		return nil, ErrDatabaseNotOpen
+	} else if name == "" {
+		return nil, ErrTableNameRequired
 	}
-	return stats, nil
+
+	t := db.table(name)
+	if err := t.open(); err != nil {
+		return nil, err
+	}
+
+	// Cache the table and return it.
+	db.tables[name] = t
+	return t, nil
+}
+
+// table creates a reference to a table associated with this database.
+// Returns a reference to an existing table if one already exists.
+func (db *DB) table(name string) *Table {
+	// Check for an already open table.
+	if t, ok := db.tables[name]; ok {
+		return t
+	}
+
+	// Set defaults on table.
+	maxDBs := db.MaxDBs
+	maxReaders := db.MaxReaders
+	if maxDBs == 0 {
+		maxDBs = DefaultMaxDBs
+	}
+	if maxReaders == 0 {
+		maxReaders = DefaultMaxReaders
+	}
+
+	// Create table instance and return it.
+	return &Table{
+		db:         db,
+		name:       name,
+		path:       db.tablePath(name),
+		noSync:     db.NoSync,
+		maxDBs:     maxDBs,
+		maxReaders: maxReaders,
+	}
 }

@@ -8,9 +8,9 @@ import (
 
 	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/parser"
-	"github.com/skydb/sky/query/mapper"
 	"github.com/skydb/sky/query/hashmap"
+	"github.com/skydb/sky/query/mapper"
+	"github.com/skydb/sky/query/parser"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -283,4 +283,3 @@ func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[
 
 	return err
 }
-

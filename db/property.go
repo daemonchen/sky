@@ -4,17 +4,43 @@ import (
 	"regexp"
 )
 
-var (
-	InvalidPropertyNameError     = &Error{"invalid property name", nil}
-	InvalidPropertyDataTypeError = &Error{"invalid property data type", nil}
-)
-
 // Property represents part of the schema for a Table.
 type Property struct {
-	Id        int64  `json:"id"`
+	table     *Table
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
-	Transient bool   `json:"transient"`
 	DataType  string `json:"dataType"`
+	Transient bool   `json:"transient"`
+}
+
+// Validate checks that the property is valid. Properties can be invalid if
+// non-alphanumeric characters are used in its name or if the data type is not
+// a valid type.
+func (p *Property) Validate() error {
+	// Validate that name is non-blank and doesn't contain invalid characters.
+	if p.Name == "" || !regexp.MustCompile(`^\w+$`).MatchString(p.Name) {
+		return ErrInvalidPropertyName
+	}
+
+	// Validate data type.
+	switch p.DataType {
+	case Factor, String, Integer, Float, Boolean:
+	default:
+		return ErrInvalidDataType
+	}
+
+	return nil
+}
+
+// Clone makes a copy of the property.
+func (p *Property) Clone() *Property {
+	return &Property{
+		table:     p.table,
+		ID:        p.ID,
+		Name:      p.Name,
+		Transient: p.Transient,
+		DataType:  p.DataType,
+	}
 }
 
 // Cast converts a value into the appropriate Go type based on the property's data type.
@@ -53,23 +79,4 @@ func (p *Property) Cast(v interface{}) interface{} {
 		}
 	}
 	return v
-}
-
-// Validate checks that the property is valid. Properties can be invalid if
-// non-alphanumeric characters are used in its name or if the data type is not
-// a valid type.
-func (p *Property) Validate() error {
-	// Validate that name is non-blank and doesn't contain invalid characters.
-	if p.Name == "" || !regexp.MustCompile(`^\w+$`).MatchString(p.Name) {
-		return InvalidPropertyNameError
-	}
-
-	// Validate data type.
-	switch p.DataType {
-	case Factor, String, Integer, Float, Boolean:
-	default:
-		return InvalidPropertyDataTypeError
-	}
-
-	return nil
 }

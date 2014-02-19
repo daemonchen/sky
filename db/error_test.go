@@ -1,12 +1,13 @@
 package db
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	_assert "github.com/stretchr/testify/assert"
 )
 
 // Ensure that nested errors are appropriately formatted.
 func TestError(t *testing.T) {
 	e := &Error{"one error", &Error{"two error", nil}}
-	assert.Equal(t, e.Error(), "one error: two error")
+	_assert.Equal(t, e.Error(), "one error: two error")
 }
