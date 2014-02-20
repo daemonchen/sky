@@ -24,6 +24,10 @@ var (
 
 	// ErrTableNameRequired is returned when open a table without a name.
 	ErrTableNameRequired = &Error{"table name required", nil}
+
+	// ErrFactorNotFound is returned when defactorizing a value that has not
+	// previously been factorized.
+	ErrFactorNotFound = &Error{"factor not found", nil}
 )
 
 var (

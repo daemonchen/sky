@@ -12,13 +12,13 @@ func TestFactorCacheGetValue(t *testing.T) {
 	c.add("foo1", 2)
 	c.add("foo2", 3)
 	value, ok := c.getValue("foo0")
-	_assert.Equal(t, value, uint64(0))
+	_assert.Equal(t, value, 0)
 	_assert.Equal(t, ok, false)
 	value, ok = c.getValue("foo1")
-	_assert.Equal(t, value, uint64(2))
+	_assert.Equal(t, value, 2)
 	_assert.Equal(t, ok, true)
 	value, ok = c.getValue("foo2")
-	_assert.Equal(t, value, uint64(3))
+	_assert.Equal(t, value, 3)
 	_assert.Equal(t, ok, true)
 }
 
@@ -69,7 +69,7 @@ func TestFactorCacheReplace(t *testing.T) {
 	c.add("foo1", 2)
 	c.add("foo0", 3)
 	value, _ := c.getValue("foo0")
-	_assert.Equal(t, value, uint64(3))
+	_assert.Equal(t, value, 3)
 	value, _ = c.getValue("foo1")
-	_assert.Equal(t, value, uint64(2))
+	_assert.Equal(t, value, 2)
 }

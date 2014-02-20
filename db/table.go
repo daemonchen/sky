@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,14 @@ import (
 	"github.com/szferi/gomdb"
 )
 
+// maxKeySize is the size, in bytes, of the largest key that can be inserted.
+// This is a limitation of LMDB.
+const maxKeySize = 500
+
+// cacheSize is the number of factors that are stored in the LRU cache.
+// This cache size is per-property.
+const cacheSize = 1000
+
 // Table represents a collection of objects.
 type Table struct {
 	sync.RWMutex
@@ -20,6 +29,7 @@ type Table struct {
 	path       string
 	properties map[string]*Property
 	env        *mdb.Env
+	caches     map[int]*cache
 
 	shardCount     int
 	maxPermanentID int
@@ -124,7 +134,7 @@ func (t *Table) _open() error {
 
 		// Initialize shards.
 		for i := 0; i < t.shardCount; i++ {
-			err := txn.dbi(fmt.Sprintf("shard.%d", i), mdb.DUPSORT)
+			err := txn.dbi(fmt.Sprintf("shards/%d", i), mdb.DUPSORT)
 			assert(err == nil, "shard dbi error: %v", err)
 		}
 		return nil
@@ -137,6 +147,27 @@ func (t *Table) _open() error {
 	if err := t.load(); err != nil {
 		t._close()
 		return err
+	}
+
+	// Initialize factor databases.
+	err = t.txn(0, func(txn *transaction) error {
+		for _, p := range t.properties {
+			if p.DataType != Factor {
+				continue
+			}
+			err := txn.dbi(factorDBName(p.ID), 0)
+			assert(err == nil, "factor dbi error: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Initialize the factor caches.
+	t.caches = make(map[int]*cache)
+	for _, p := range t.properties {
+		t.caches[p.ID] = newCache(cacheSize)
 	}
 
 	return nil
@@ -182,7 +213,7 @@ func (t *Table) load() error {
 		} else if len(value) == 0 {
 			return nil
 		}
-		warnf("unmarshal: %s", string(value))
+		// warnf("unmarshal: %s", string(value))
 		if err := t.unmarshal(value); err != nil {
 			return err
 		}
@@ -193,7 +224,7 @@ func (t *Table) load() error {
 func (t *Table) save() error {
 	return t.txn(0, func(txn *transaction) error {
 		value, err := t.marshal()
-		warnf("marshal: %s", string(value))
+		// warnf("marshal: %s", string(value))
 		assert(err == nil, "table marshal error: %v", err)
 		return txn.put("meta", []byte("meta"), value)
 	})
@@ -266,11 +297,25 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 		p.ID = t.maxPermanentID
 	}
 
+	// Initialize factor database.
+	if p.DataType == Factor {
+		err := t.txn(0, func(txn *transaction) error {
+			err := txn.dbi(factorDBName(p.ID), 0)
+			assert(err == nil, "factor dbi error: %v", err)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Add it to the collection.
+	properties := t.properties
 	t.copyProperties()
 	t.properties[name] = p
 
 	if err := t.save(); err != nil {
+		t.properties = properties
 		return nil, err
 	}
 
@@ -289,6 +334,7 @@ func (t *Table) RenameProperty(oldName, newName string) (*Property, error) {
 		return nil, ErrPropertyExists
 	}
 
+	properties := t.properties
 	t.copyProperties()
 	p := t.properties[oldName].Clone()
 	p.Name = newName
@@ -296,6 +342,7 @@ func (t *Table) RenameProperty(oldName, newName string) (*Property, error) {
 	t.properties[newName] = p
 
 	if err := t.save(); err != nil {
+		t.properties = properties
 		return nil, err
 	}
 	return p, nil
@@ -310,8 +357,16 @@ func (t *Table) DeleteProperty(name string) error {
 	} else if t.properties[name] == nil {
 		return ErrPropertyNotFound
 	}
+
+	properties := t.properties
+	t.copyProperties()
 	delete(t.properties, name)
-	return t.save()
+
+	if err := t.save(); err != nil {
+		t.properties = properties
+		return err
+	}
+	return nil
 }
 
 // copyProperties creates a new map and copies all existing properties.
@@ -321,6 +376,144 @@ func (t *Table) copyProperties() {
 		properties[k] = v
 	}
 	t.properties = properties
+}
+
+// factorize converts a factor property value to its integer index representation.
+// Returns an error if the factor could not be found and createIfNotExists is false.
+func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) (int, error) {
+	// Blank is always zero.
+	if value == "" {
+		return 0, nil
+	}
+
+	// Check the LRU first.
+	if sequence, ok := t.caches[propertyID].getValue(value); ok {
+		return sequence, nil
+	}
+
+	// Find an existing factor for the value.
+	var val int
+	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
+		data, err := txn.get(factorDBName(propertyID), factorKey(value))
+		if err != nil {
+			return err
+		} else if data != nil {
+			val = int(binary.BigEndian.Uint64(data))
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	} else if val != 0 {
+		return val, nil
+	}
+
+	// Create a new factor if requested.
+	if createIfNotExists {
+		return t.addFactor(propertyID, value)
+	}
+
+	return 0, ErrFactorNotFound
+}
+
+func (t *Table) addFactor(propertyID int, value string) (int, error) {
+	var index int
+	err := t.txn(0, func(txn *transaction) error {
+		// Look up next sequence index.
+		data, err := txn.get(factorDBName(propertyID), []byte("+"))
+		if err != nil {
+			return err
+		} else if data == nil {
+			data = make([]byte, 8)
+		}
+
+		// Read identifier and increment.
+		index = int(binary.BigEndian.Uint64(data))
+		index += 1
+
+		// Save incremented index.
+		binary.BigEndian.PutUint64(data, uint64(index))
+		if err = txn.put(factorDBName(propertyID), []byte("+"), data); err != nil {
+			return err
+		}
+
+		// Truncate the value so it fits in our max key size.
+		value = truncateFactor(value)
+
+		// Store the value-to-index lookup.
+		binary.BigEndian.PutUint64(data[:], uint64(index))
+		if err := txn.put(factorDBName(propertyID), factorKey(value), data); err != nil {
+			return err
+		}
+
+		// Save the index-to-value lookup.
+		if err := txn.put(factorDBName(propertyID), reverseFactorKey(index), []byte(value)); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	// Add to cache.
+	t.caches[propertyID].add(value, index)
+
+	return index, nil
+}
+
+// defactorize converts a factor index to its string value.
+func (t *Table) defactorize(propertyID int, index int) (string, error) {
+	// Blank is always zero.
+	if index == 0 {
+		return "", nil
+	}
+
+	// Check the cache first.
+	if key, ok := t.caches[propertyID].getKey(index); ok {
+		return key, nil
+	}
+
+	var data []byte
+	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
+		var err error
+		data, err = txn.get(factorDBName(propertyID), reverseFactorKey(index))
+		return err
+	})
+	if err != nil {
+		return "", err
+	} else if data == nil {
+		return "", ErrFactorNotFound
+	}
+
+	// Add to cache.
+	t.caches[propertyID].add(string(data), index)
+
+	return string(data), nil
+}
+
+// factorDBName returns the name of the factor table for a property.
+func factorDBName(propertyID int) string {
+	return fmt.Sprintf("factors/%d", propertyID)
+}
+
+// factorKey returns the value-to-index key.
+func factorKey(value string) []byte {
+	return []byte(fmt.Sprintf(">%s", truncateFactor(value)))
+}
+
+// reverseFactorKey returns the index-to-value key.
+func reverseFactorKey(index int) []byte {
+	return []byte(fmt.Sprintf("<%d", index))
+}
+
+// truncateFactor returns the value that can be saved to the factorizer because
+// of LMDB key size restrictions.
+func truncateFactor(value string) string {
+	if len(value) > maxKeySize {
+		return value[0:maxKeySize]
+	}
+	return value
 }
 
 // marshal encodes the table into a byte slice.

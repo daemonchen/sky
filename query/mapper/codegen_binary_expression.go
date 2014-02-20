@@ -150,7 +150,7 @@ func (m *Mapper) codegenFactorEquality(node *ast.BinaryExpression, lhs *ast.VarR
 		}
 
 		id, err := m.factorizer.Factorize(name, rhs.Value, false)
-		if err == db.FactorNotFoundError {
+		if err == db.ErrFactorNotFound {
 			return nilValue, err
 		}
 		return m.icmp(op, lhsValue, m.constint(int(id)), ""), nil
