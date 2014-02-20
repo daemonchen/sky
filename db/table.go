@@ -28,6 +28,7 @@ type Table struct {
 	name       string
 	path       string
 	properties map[string]*Property
+	propertiesByID map[int]*Property
 	env        *mdb.Env
 	caches     map[int]*cache
 
@@ -240,6 +241,16 @@ func (t *Table) Properties() (map[string]*Property, error) {
 	return t.properties, nil
 }
 
+// Properties retrieves a map of properties by property identifier.
+func (t *Table) PropertiesByID() (map[int]*Property, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+	return t.propertiesByID, nil
+}
+
 // Property returns a single property from the table with the given name.
 func (t *Table) Property(name string) (*Property, error) {
 	t.Lock()
@@ -257,12 +268,7 @@ func (t *Table) PropertyByID(id int) (*Property, error) {
 	if !t.opened() {
 		return nil, ErrTableNotOpen
 	}
-	for _, p := range t.properties {
-		if p.ID == id {
-			return p, nil
-		}
-	}
-	return nil, nil
+	return t.propertiesByID[id], nil
 }
 
 // CreateProperty creates a new property on the table.
@@ -310,12 +316,14 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 	}
 
 	// Add it to the collection.
-	properties := t.properties
+	properties, propertiesByID := t.properties, t.propertiesByID
 	t.copyProperties()
 	t.properties[name] = p
+	t.propertiesByID[p.ID] = p
 
 	if err := t.save(); err != nil {
 		t.properties = properties
+		t.propertiesByID = propertiesByID
 		return nil, err
 	}
 
@@ -354,16 +362,21 @@ func (t *Table) DeleteProperty(name string) error {
 	defer t.Unlock()
 	if !t.opened() {
 		return ErrTableNotOpen
-	} else if t.properties[name] == nil {
+	}
+
+	p := t.properties[name]
+	if p == nil {
 		return ErrPropertyNotFound
 	}
 
-	properties := t.properties
+	properties, propertiesByID := t.properties, t.propertiesByID
 	t.copyProperties()
 	delete(t.properties, name)
+	delete(t.propertiesByID, p.ID)
 
 	if err := t.save(); err != nil {
 		t.properties = properties
+		t.propertiesByID = propertiesByID
 		return err
 	}
 	return nil
@@ -376,7 +389,145 @@ func (t *Table) copyProperties() {
 		properties[k] = v
 	}
 	t.properties = properties
+
+	propertiesByID := make(map[int]*Property)
+	for k, v := range t.propertiesByID {
+		propertiesByID[k] = v
+	}
+	t.propertiesByID = propertiesByID
 }
+
+// GetEvent returns a single event for an object at a given timestamp.
+func (t *Table) GetEvent(id string, timestamp time.Time) (*Event, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+	return nil, nil // TODO
+}
+
+// GetEvents returns all events for an object in chronological order.
+func (t *Table) GetEvents(id string) ([]*Event, error) {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return nil, ErrTableNotOpen
+	}
+	return nil, nil // TODO
+}
+
+func (t *Table) getEvent(id string, timestamp int64) (*rawEvent, error) {
+	var _prefix [8]byte
+	prefix := b[:]
+	binary.Write(binary.BigEndian.PutUint64(bs, uint64(timestamp))
+
+	// Retrieve event bytes from the database.
+	var b []byte
+	err := t.txn(func(txn *transaction) error {
+		shardIndex := hash.Local(id)
+		return txn.getAt(shardDBName(shardIndex), []byte(id), )
+	})
+
+	// Convert to raw event.
+	rawEvent, err := t.toRawEvent(e)
+	if err != nil {
+		return err
+	}
+
+	// Retrieve existing event for object at the same moment and merge.
+	current, err := t.getEvent(id, e)
+	if current != nil {
+		data := current.data
+		for k, v := range rawEvent.data {
+			data[k] = v
+		}
+		rawEvent.data = data
+	}
+
+	// Marshal raw event into byte slice.
+	b, err := rawEvent.marshal()
+	if err != nil {
+		return err
+	}
+
+	// Insert event into appropriate shard.
+	return t.txn(func(txn *transaction) error {
+		shardIndex := hash.Local(id)
+		return txn.put(shardDBName(shardIndex), []byte(id), b)
+	})
+}
+
+// InsertEvent inserts an event for an object.
+func (t *Table) InsertEvent(id string, event *Event) error {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return ErrTableNotOpen
+	}
+	return t.insertEvent(id, event)
+}
+
+// InsertEvents inserts multiple events for an object.
+func (t *Table) InsertEvents(id string, events []*Event) error {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return ErrTableNotOpen
+	}
+	return nil // TODO
+}
+
+func (t *Table) insertEvent(id string, e *Event) error {
+	// Convert to raw event.
+	rawEvent, err := t.toRawEvent(e)
+	if err != nil {
+		return err
+	}
+
+	// Retrieve existing event for object at the same moment and merge.
+	current, err := t.getEvent(id, e)
+	if current != nil {
+		data := current.data
+		for k, v := range rawEvent.data {
+			data[k] = v
+		}
+		rawEvent.data = data
+	}
+
+	// Marshal raw event into byte slice.
+	b, err := rawEvent.marshal()
+	if err != nil {
+		return err
+	}
+
+	// Insert event into appropriate shard.
+	return t.txn(func(txn *transaction) error {
+		shardIndex := hash.Local(id)
+		return txn.put(shardDBName(shardIndex), []byte(id), b)
+	})
+}
+
+// DeleteEvent removes a single event for an object at a given timestamp.
+func (t *Table) DeleteEvent(id string, timestamp time.Time) error {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return ErrTableNotOpen
+	}
+	return nil // TODO
+}
+
+// DeleteEvents removes all events for an object.
+func (t *Table) DeleteEvents(id string) error {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return ErrTableNotOpen
+	}
+	return nil // TODO
+}
+
 
 // factorize converts a factor property value to its integer index representation.
 // Returns an error if the factor could not be found and createIfNotExists is false.
@@ -537,8 +688,10 @@ func (t *Table) unmarshal(data []byte) error {
 	t.shardCount = msg.ShardCount
 
 	t.properties = make(map[string]*Property)
+	t.propertiesByID = make(map[int]*Property)
 	for _, p := range msg.Properties {
 		t.properties[p.Name] = p
+		t.propertiesByID[p.ID] = p
 	}
 
 	return nil
@@ -560,6 +713,45 @@ func (t *Table) txn(flags uint, fn func(*transaction) error) error {
 	return nil
 }
 
+// toRawEvent returns a raw event representation of this event.
+func (t *Table) toRawEvent(e *Event) (*rawEvent, error) {
+	rawEvent := &rawEvent{
+		timestamp: shiftTime(e.Timestamp),
+		data:make(map[int]interface{}),
+	}
+
+	// Map data by property id instead of name.
+	for k, v := range e.Data {
+		p := t.properties[k]
+		if p == nil {
+			return nil, ErrPropertyNotFound
+		}
+
+		// Cast the value to the appropriate type.
+		v = p.Cast(v)
+
+		// Factorize value, if needed.
+		if p.DataType == Factor {
+			var err error
+			v, err = t.factorize(p.ID, v.(string), true)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		rawEvent.data[p.ID] = v
+	}
+
+	return rawEvent, nil
+}
+
+// toEvent returns an normal event representation of this raw event.
+func (t *Table) toEvent(e *rawEvent) (*rawEvent) {
+	return nil // TODO
+}
+
+
+
 type tableRawMessage struct {
 	Name           string      `json:"name"`
 	ShardCount     int         `json:"shardCount"`
@@ -574,8 +766,46 @@ type Event struct {
 	Data      map[string]interface{}
 }
 
-// rawEvent represents an internal event.
+// rawEvent represents an internal event structure.
 type rawEvent struct {
-	Timestamp int64
-	Data      map[int64]interface{}
+	timestamp int64
+	data      map[int]interface{}
+}
+
+// marshal encodes the raw event as a byte slice.
+func (e *rawEvent) marshal() ([]byte, error) {
+	var buf bytes.Buffer
+	err := binary.Write(&buf, binary.BigEndian, e.timestamp)
+	assert(err == nil, "timestamp marshal error: %v", err)
+
+	var handle codec.MsgpackHandle
+	handle.RawToString = true
+	if err := codec.NewEncoder(&buf, &handle).Encode(e.data); err != nil {
+		return err
+	}
+	return buf.Bytes(), nil
+}
+
+// unmarshal decodes a raw event from a byte slice.
+func (e *rawEvent) unmarshal(b []byte) error {
+	var buf = bytes.NewBuffer(b)
+	err := binary.Read(&buf, binary.BigEndian, e.timestamp)
+	assert(err == nil, "timestamp unmarshal error: %v", err)
+
+	e.data = make(map[int]interface{})
+	var handle codec.MsgpackHandle
+	handle.RawToString = true
+	if err := codec.NewDecoder(&buf, &handle).Decode(&e.data); err != nil {
+		return err
+	}
+	e.normalize()
+
+	return nil
+}
+
+// normalize promotes all values of the raw event to appropriate types.
+func (e *rawEvent) normalize() {
+	for k, v := range e.data {
+		e.data[k] = promote(v)
+	}
 }
