@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -9,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/skydb/sky/hash"
 	"github.com/szferi/gomdb"
+	"github.com/ugorji/go/codec"
 )
 
 // maxKeySize is the size, in bytes, of the largest key that can be inserted.
@@ -24,13 +27,13 @@ const cacheSize = 1000
 type Table struct {
 	sync.RWMutex
 
-	db         *DB
-	name       string
-	path       string
-	properties map[string]*Property
+	db             *DB
+	name           string
+	path           string
+	properties     map[string]*Property
 	propertiesByID map[int]*Property
-	env        *mdb.Env
-	caches     map[int]*cache
+	env            *mdb.Env
+	caches         map[int]*cache
 
 	shardCount     int
 	maxPermanentID int
@@ -135,7 +138,7 @@ func (t *Table) _open() error {
 
 		// Initialize shards.
 		for i := 0; i < t.shardCount; i++ {
-			err := txn.dbi(fmt.Sprintf("shards/%d", i), mdb.DUPSORT)
+			err := txn.dbi(shardDBName(i), mdb.DUPSORT)
 			assert(err == nil, "shard dbi error: %v", err)
 		}
 		return nil
@@ -404,7 +407,13 @@ func (t *Table) GetEvent(id string, timestamp time.Time) (*Event, error) {
 	if !t.opened() {
 		return nil, ErrTableNotOpen
 	}
-	return nil, nil // TODO
+	rawEvent, err := t.getRawEvent(id, shiftTime(timestamp))
+	if err != nil {
+		return nil, err
+	} else if rawEvent == nil {
+		return nil, nil
+	}
+	return t.toEvent(rawEvent)
 }
 
 // GetEvents returns all events for an object in chronological order.
@@ -417,45 +426,31 @@ func (t *Table) GetEvents(id string) ([]*Event, error) {
 	return nil, nil // TODO
 }
 
-func (t *Table) getEvent(id string, timestamp int64) (*rawEvent, error) {
-	var _prefix [8]byte
-	prefix := b[:]
-	binary.Write(binary.BigEndian.PutUint64(bs, uint64(timestamp))
+func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, timestamp)
+	prefix := buf.Bytes()
 
 	// Retrieve event bytes from the database.
 	var b []byte
-	err := t.txn(func(txn *transaction) error {
-		shardIndex := hash.Local(id)
-		return txn.getAt(shardDBName(shardIndex), []byte(id), )
-	})
-
-	// Convert to raw event.
-	rawEvent, err := t.toRawEvent(e)
-	if err != nil {
+	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
+		var err error
+		b, err = txn.getAt(shardDBName(t.shardIndex(id)), []byte(id), prefix)
 		return err
-	}
-
-	// Retrieve existing event for object at the same moment and merge.
-	current, err := t.getEvent(id, e)
-	if current != nil {
-		data := current.data
-		for k, v := range rawEvent.data {
-			data[k] = v
-		}
-		rawEvent.data = data
-	}
-
-	// Marshal raw event into byte slice.
-	b, err := rawEvent.marshal()
-	if err != nil {
-		return err
-	}
-
-	// Insert event into appropriate shard.
-	return t.txn(func(txn *transaction) error {
-		shardIndex := hash.Local(id)
-		return txn.put(shardDBName(shardIndex), []byte(id), b)
 	})
+	if err != nil {
+		return nil, err
+	} else if b == nil {
+		return nil, nil
+	}
+
+	// Unmarshal bytes into a raw event.
+	e := &rawEvent{}
+	if err := e.unmarshal(b); err != nil {
+		return nil, err
+	}
+
+	return e, nil
 }
 
 // InsertEvent inserts an event for an object.
@@ -475,7 +470,12 @@ func (t *Table) InsertEvents(id string, events []*Event) error {
 	if !t.opened() {
 		return ErrTableNotOpen
 	}
-	return nil // TODO
+	for _, event := range events {
+		if err := t.insertEvent(id, event); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (t *Table) insertEvent(id string, e *Event) error {
@@ -486,7 +486,7 @@ func (t *Table) insertEvent(id string, e *Event) error {
 	}
 
 	// Retrieve existing event for object at the same moment and merge.
-	current, err := t.getEvent(id, e)
+	current, err := t.getRawEvent(id, rawEvent.timestamp)
 	if current != nil {
 		data := current.data
 		for k, v := range rawEvent.data {
@@ -501,10 +501,14 @@ func (t *Table) insertEvent(id string, e *Event) error {
 		return err
 	}
 
+	// Create the timestamp prefix.
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, rawEvent.timestamp)
+	prefix := buf.Bytes()
+
 	// Insert event into appropriate shard.
-	return t.txn(func(txn *transaction) error {
-		shardIndex := hash.Local(id)
-		return txn.put(shardDBName(shardIndex), []byte(id), b)
+	return t.txn(0, func(txn *transaction) error {
+		return txn.putAt(shardDBName(t.shardIndex(id)), []byte(id), prefix, b)
 	})
 }
 
@@ -527,7 +531,6 @@ func (t *Table) DeleteEvents(id string) error {
 	}
 	return nil // TODO
 }
-
 
 // factorize converts a factor property value to its integer index representation.
 // Returns an error if the factor could not be found and createIfNotExists is false.
@@ -643,6 +646,16 @@ func (t *Table) defactorize(propertyID int, index int) (string, error) {
 	return string(data), nil
 }
 
+// shardIndex returns the appropriate shard for a given object id.
+func (t *Table) shardIndex(id string) int {
+	return int(hash.Local(id)) % t.shardCount
+}
+
+// shardDBName returns the name of the shard table.
+func shardDBName(index int) string {
+	return fmt.Sprintf("shards/%d", index)
+}
+
 // factorDBName returns the name of the factor table for a property.
 func factorDBName(propertyID int) string {
 	return fmt.Sprintf("factors/%d", propertyID)
@@ -717,7 +730,7 @@ func (t *Table) txn(flags uint, fn func(*transaction) error) error {
 func (t *Table) toRawEvent(e *Event) (*rawEvent, error) {
 	rawEvent := &rawEvent{
 		timestamp: shiftTime(e.Timestamp),
-		data:make(map[int]interface{}),
+		data:      make(map[int]interface{}),
 	}
 
 	// Map data by property id instead of name.
@@ -746,11 +759,38 @@ func (t *Table) toRawEvent(e *Event) (*rawEvent, error) {
 }
 
 // toEvent returns an normal event representation of this raw event.
-func (t *Table) toEvent(e *rawEvent) (*rawEvent) {
-	return nil // TODO
+func (t *Table) toEvent(e *rawEvent) (*Event, error) {
+	event := &Event{
+		Timestamp: unshiftTime(e.timestamp),
+		Data:      make(map[string]interface{}),
+	}
+
+	// Map data by name instead of property id.
+	for k, v := range e.data {
+		p := t.propertiesByID[k]
+
+		// Missing properties have been deleted so just ignore.
+		if p == nil {
+			continue
+		}
+
+		// Cast the value to the appropriate type.
+		v = p.Cast(v)
+
+		// Defactorize value, if needed.
+		if p.DataType == Factor {
+			var err error
+			v, err = t.defactorize(p.ID, int(v.(int64)))
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		event.Data[p.Name] = v
+	}
+
+	return event, nil
 }
-
-
 
 type tableRawMessage struct {
 	Name           string      `json:"name"`
@@ -781,7 +821,7 @@ func (e *rawEvent) marshal() ([]byte, error) {
 	var handle codec.MsgpackHandle
 	handle.RawToString = true
 	if err := codec.NewEncoder(&buf, &handle).Encode(e.data); err != nil {
-		return err
+		return nil, err
 	}
 	return buf.Bytes(), nil
 }
@@ -789,13 +829,13 @@ func (e *rawEvent) marshal() ([]byte, error) {
 // unmarshal decodes a raw event from a byte slice.
 func (e *rawEvent) unmarshal(b []byte) error {
 	var buf = bytes.NewBuffer(b)
-	err := binary.Read(&buf, binary.BigEndian, e.timestamp)
+	err := binary.Read(buf, binary.BigEndian, &e.timestamp)
 	assert(err == nil, "timestamp unmarshal error: %v", err)
 
 	e.data = make(map[int]interface{})
 	var handle codec.MsgpackHandle
 	handle.RawToString = true
-	if err := codec.NewDecoder(&buf, &handle).Decode(&e.data); err != nil {
+	if err := codec.NewDecoder(buf, &handle).Decode(&e.data); err != nil {
 		return err
 	}
 	e.normalize()

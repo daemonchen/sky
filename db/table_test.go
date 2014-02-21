@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/skydb/sky/db"
 	"github.com/stretchr/testify/assert"
@@ -186,12 +187,36 @@ func TestTableProperties(t *testing.T) {
 	})
 }
 
-// Ensure that retrieve the properties of a table when it's closed returns an error.
+// Ensure that retrieving the properties of a table when it's closed returns an error.
 func TestTablePropertiesNotOpen(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		table, _ := db.CreateTable("foo")
 		db.Close()
 		p, err := table.Properties()
+		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Nil(t, p)
+	})
+}
+
+// Ensure that the table can return a map of properties by id.
+func TestTablePropertiesByID(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", String, true)
+		table.CreateProperty("prop2", Factor, false)
+		p, err := table.PropertiesByID()
+		assert.NoError(t, err)
+		assert.Equal(t, p[-1].Name, "prop1")
+		assert.Equal(t, p[1].Name, "prop2")
+	})
+}
+
+// Ensure that retrieving the properties of a table by id when it's closed returns an error.
+func TestTablePropertiesByIDNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		p, err := table.PropertiesByID()
 		assert.Equal(t, err, ErrTableNotOpen)
 		assert.Nil(t, p)
 	})
@@ -266,45 +291,137 @@ func TestTableReopen(t *testing.T) {
 	})
 }
 
-/*
-import (
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"testing"
-
-	. "github.com/skydb/sky/db"
-	"github.com/stretchr/testify/assert"
-)
-
-// Ensure that we can create a new table.
-func TestTableOpen(t *testing.T) {
-	path, _ := ioutil.TempDir("", "")
-	defer os.RemoveAll(path)
-	table := &Table{Name: "test"}
-	assert.NoError(t, table.Create(filepath.Join(path, "test")))
-}
-
-// Ensure that we can create properties on a table.
-func TestTableCreateProperty(t *testing.T) {
-	withTable(func(table *Table) {
-		p, err := table.CreateProperty("name", false, "string")
-		assert.NoError(t, err)
-		assert.Equal(t, p.Name, "name")
-		assert.Equal(t, p.Transient, false)
-		assert.Equal(t, p.DataType, "string")
+// Ensure that retrieving an event while the database is closed returns an error.
+func TestTableGetEventNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		e, err := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Nil(t, e)
 	})
 }
 
-func withTable(f func(*Table)) {
-	path, _ := ioutil.TempDir("", "")
-	defer os.RemoveAll(path)
+// Ensure that a table can insert an event.
+func TestTableInsertEvent(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Integer, false)
+		table.CreateProperty("prop2", String, true)
+		err := table.InsertEvent("user1", newEvent("2000-01-01T00:00:01Z", "prop1", 20, "prop2", "bob"))
+		assert.NoError(t, err)
+		err = table.InsertEvent("user2", newEvent("2000-01-01T00:00:01Z", "prop1", 100))
+		assert.NoError(t, err)
+		err = table.InsertEvent("user1", newEvent("2000-01-01T00:00:00Z", "prop2", "susy"))
+		assert.NoError(t, err)
 
-	table := &Table{Name: "test"}
-	if err := table.Open(path); err != nil {
-		panic("table open error: " + err.Error())
-	}
+		// Find first user's first event.
+		e, err := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		if assert.NoError(t, err) && assert.NotNil(t, e) {
+			assert.Equal(t, e.Timestamp, mustParseTime("2000-01-01T00:00:01Z"))
+			assert.Equal(t, e.Data["prop1"], int64(20))
+			assert.Equal(t, e.Data["prop2"], "bob")
+		}
 
-	f(table)
+		// Find first user's second event.
+		e, err = table.GetEvent("user1", mustParseTime("2000-01-01T00:00:00Z"))
+		if assert.NoError(t, err) && assert.NotNil(t, e) {
+			assert.Equal(t, e.Timestamp, mustParseTime("2000-01-01T00:00:00Z"))
+			assert.Nil(t, e.Data["prop1"])
+			assert.Equal(t, e.Data["prop2"], "susy")
+		}
+
+		// Find second user's only event.
+		e, err = table.GetEvent("user2", mustParseTime("2000-01-01T00:00:01Z"))
+		if assert.NoError(t, err) && assert.NotNil(t, e) {
+			assert.Equal(t, e.Timestamp, mustParseTime("2000-01-01T00:00:01Z"))
+			assert.Equal(t, e.Data["prop1"], int64(100))
+			assert.Nil(t, e.Data["prop2"])
+		}
+
+		// Nonexistent user shouldn't return any event.
+		e, err = table.GetEvent("no-such-user", mustParseTime("2000-01-01T00:00:00Z"))
+		assert.NoError(t, err)
+		assert.Nil(t, e)
+
+		// Nonexistent event shouldn't return any event.
+		e, err = table.GetEvent("user1", mustParseTime("1999-01-01T00:00:00Z"))
+		assert.NoError(t, err)
+		assert.Nil(t, e)
+	})
 }
-*/
+
+// Ensure that inserting an event into a closed table returns an error.
+func TestTableInsertEventNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		err := table.InsertEvent("user1", newEvent("2000-01-01T00:00:01Z", "prop1", 20, "prop2", "bob"))
+		assert.Equal(t, err, ErrTableNotOpen)
+	})
+}
+
+// Ensure that a table can insert multiple events.
+func TestTableInsertEvents(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Integer, false)
+		table.CreateProperty("prop2", String, true)
+		err := table.InsertEvents("user1", []*Event{
+			newEvent("2000-01-01T00:00:01Z", "prop1", 20, "prop2", "bob"),
+			newEvent("2000-01-01T00:00:00Z", "prop2", "susy"),
+		})
+		assert.NoError(t, err)
+		err = table.InsertEvents("user2", []*Event{
+			newEvent("2000-01-01T00:00:01Z", "prop1", 100),
+		})
+		assert.NoError(t, err)
+		err = table.InsertEvents("user3", []*Event{})
+
+		// Find first user's events.
+		events, err := table.GetEvents("user1")
+		if assert.NoError(t, err) && assert.Equal(t, len(events), 2) {
+			assert.Equal(t, events[0].Timestamp, mustParseTime("2000-01-01T00:00:00Z"))
+			assert.Nil(t, events[0].Data["prop1"])
+			assert.Equal(t, events[0].Data["prop2"], "susy")
+
+			assert.Equal(t, events[1].Timestamp, mustParseTime("2000-01-01T00:00:01Z"))
+			assert.Equal(t, events[1].Data["prop1"], int64(20))
+			assert.Equal(t, events[1].Data["prop2"], "bob")
+		}
+
+		// Find second user's events.
+		events, err = table.GetEvents("user2")
+		if assert.NoError(t, err) && assert.Equal(t, len(events), 1) {
+			assert.Equal(t, events[0].Timestamp, mustParseTime("2000-01-01T00:00:01Z"))
+			assert.Equal(t, events[0].Data["prop1"], int64(100))
+			assert.Nil(t, events[0].Data["prop2"])
+		}
+
+		// Third user should have no events.
+		events, err = table.GetEvents("user3")
+		assert.NoError(t, err)
+		assert.Equal(t, len(events), 0)
+
+		// Non-existent user should have no events.
+		events, err = table.GetEvents("no-such-user")
+		assert.NoError(t, err)
+		assert.Equal(t, len(events), 0)
+	})
+}
+
+func newEvent(timestamp string, pairs ...interface{}) *Event {
+	e := &Event{Timestamp: mustParseTime(timestamp), Data: make(map[string]interface{})}
+	for i := 0; i < len(pairs); i += 2 {
+		e.Data[pairs[i].(string)] = pairs[i+1]
+	}
+	return e
+}
+
+func mustParseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		panic(err)
+	}
+	return t.UTC()
+}
