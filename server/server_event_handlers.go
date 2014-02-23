@@ -269,14 +269,18 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 
 			case <-flushTimer.C:
 				// Flush period/timeout exceeded, flush all events.
+				flushedCount := 0
+				s.logger.Printf("[STREAM] [FLUSH TIMEOUT] [FLUSHING] timeout=`%+v`", flushPeriod)
 				for table, events := range tableObjects {
 					count, err := s.flushTableEvents(table, events)
 					if err != nil {
 						return err
 					}
 					eventsWritten += count
+					flushedCount += count
 				}
 				tableObjects = make(map[*core.Table]objectEvents)
+				s.logger.Printf("[STREAM] [FLUSH TIMEOUT] [FLUSHED] events=`%d`", flushedCount)
 				flushEventCount = 0
 				continue loop
 			}
@@ -328,13 +332,21 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 
 			// Flush events if exceeding threshold.
 			if flushEventCount >= flushThreshold {
-				count, err := s.flushTableEvents(eventTable, tableObjects[eventTable])
-				if err != nil {
-					return err
-				}
-				eventsWritten += count
 
-				delete(tableObjects, eventTable)
+				flushedCount := 0
+				s.logger.Printf("[STREAM] [FLUSH THRESHOLD] [FLUSHING] threshold=`%d` events=`%d`", flushThreshold, flushEventCount)
+				for table, events := range tableObjects {
+					count, err := s.flushTableEvents(table, events)
+					if err != nil {
+						return err
+					}
+					eventsWritten += count
+					flushedCount += count
+				}
+				s.logger.Printf("[STREAM] [FLUSH THRESHOLD] [FLUSHED] events=`%d`", flushedCount)
+
+				tableObjects = make(map[*core.Table]objectEvents)
+				flushEventCount = 0
 			}
 
 		}
@@ -342,15 +354,20 @@ func (s *Server) streamUpdateEventsHandler(w http.ResponseWriter, req *http.Requ
 		return nil
 	}()
 
+	// Flush all events before closing the stream.
 	if err == nil {
 		err = func() error {
+			flushedCount := 0
+			s.logger.Printf("[STREAM] [END FLUSH] [FLUSHING] events=`%d`")
 			for table, objects := range tableObjects {
 				count, err := s.flushTableEvents(table, objects)
 				if err != nil {
 					return err
 				}
 				eventsWritten += count
+				flushedCount += count
 			}
+			s.logger.Printf("[STREAM] [END FLUSH] [FLUSHED] events=`%d`", flushedCount)
 			return nil
 		}()
 	}
