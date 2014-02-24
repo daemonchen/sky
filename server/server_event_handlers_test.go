@@ -241,11 +241,14 @@ func TestServerStreamUpdateEventsFlushesOnPeriod(t *testing.T) {
 		// Send a single event.
 		client.Write(`{"id":"abc","table":"foo","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}` + "\n")
 
+		// This flush isn't necessary, but serves just to show that it's actually a client flush, not server flush.
+		client.Flush()
+
 		// Send a second event.
 		client.Write(`{"id":"abc","table":"foo","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}` + "\n")
+		client.Flush()
 
 		// This is necessary in order to flush.
-		client.Flush()
 		time.Sleep(time.Duration(s.StreamFlushPeriod) * time.Second)
 		time.Sleep(100 * time.Millisecond)
 
