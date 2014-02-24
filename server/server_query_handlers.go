@@ -58,7 +58,10 @@ func (s *Server) queryHandler(w http.ResponseWriter, req *http.Request, params m
 		return nil, err
 	}
 
-	q.Prefix = req.FormValue("prefix")
+	prefix := req.FormValue("prefix")
+	if prefix != "" {
+		q.Prefix = prefix
+	}
 
 	return s.RunQuery(table, q)
 }
@@ -114,6 +117,9 @@ func (s *Server) parseQuery(table *core.Table, params map[string]interface{}) (*
 	if str, ok := raw.(string); ok {
 		if q, err = query.NewParser().ParseString(str); err != nil {
 			return nil, err
+		}
+		if _, ok := params["prefix"]; ok {
+			q.Prefix = params["prefix"].(string)
 		}
 	} else if obj, ok := raw.(map[string]interface{}); ok {
 		q = query.NewQuery()

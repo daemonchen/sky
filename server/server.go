@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -408,6 +409,12 @@ func (s *Server) DeleteTable(name string) error {
 
 // Runs a query against a table.
 func (s *Server) RunQuery(table *core.Table, q *query.Query) (interface{}, error) {
+
+	// Fail if prefix is not provided.
+	if q.Prefix == "" {
+		return nil, errors.New("Prefix is required on queries.")
+	}
+
 	engines := make([]*query.ExecutionEngine, 0)
 
 	// Retrieve low-level cursors for iterating.
