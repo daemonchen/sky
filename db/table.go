@@ -423,7 +423,23 @@ func (t *Table) GetEvents(id string) ([]*Event, error) {
 	if !t.opened() {
 		return nil, ErrTableNotOpen
 	}
-	return nil, nil // TODO
+
+	// Retrieve raw events.	
+	rawEvents, err := t.getRawEvents(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to regular events and return.
+	var events []*Event
+	for _, rawEvent := range rawEvents {
+		event, err := t.toEvent(rawEvent)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, nil
 }
 
 func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
@@ -451,6 +467,32 @@ func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
 	}
 
 	return e, nil
+}
+
+func (t *Table) getRawEvents(id string) ([]*rawEvent, error) {
+	// Retrieve all bytes from the database.
+	var slices [][]byte
+	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
+		var err error
+		slices, err = txn.getAll(shardDBName(t.shardIndex(id)), []byte(id))
+		return err
+	})
+	if err != nil {
+		return nil, err
+	} else if slices == nil {
+		return nil, nil
+	}
+
+	// Unmarshal each slice into a raw event.
+	var events []*rawEvent
+	for _, b := range slices {
+		e := &rawEvent{}
+		if err := e.unmarshal(b); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, nil
 }
 
 // InsertEvent inserts an event for an object.
