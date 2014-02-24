@@ -196,7 +196,7 @@ func TestServerStreamUpdateEventsFlushesOnThreshold(t *testing.T) {
 		// Close streaming request.
 		ret := client.Close()
 
-		// Assert that 2 events were written during stream.
+		// Assert that all events were written during stream.
 		resp = ret.(*http.Response)
 		assertResponse(t, resp, 200, `{"events_written":4}`, "PATCH /events failed.")
 
