@@ -57,7 +57,7 @@ func TestServerSimpleCountQuery(t *testing.T) {
 		// _codegen(t, "foo", query)
 		//resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/query", "application/json", query)
 		//assertResponse(t, resp, 200, `{"count":5}`+"\n", "POST /tables/:name/query failed.")
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/bar/query?prefix=a", "application/json", query)
+		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/bar/query?prefix=x", "application/json", query)
 		assertResponse(t, resp, 200, `{"count":1}`+"\n", "POST /tables/:name/query failed.")
 	})
 }
