@@ -81,6 +81,49 @@ func (t *transaction) getAt(name string, key, prefix []byte) ([]byte, error) {
 	return value, nil
 }
 
+// getAll returns all values within a multi-value key.
+func (t *transaction) getAll(name string, key []byte) ([][]byte, error) {
+	dbi, err := t.DBIOpen(&name, 0)
+	if err != nil {
+		return nil, &Error{fmt.Sprintf("dbi error (%s)", name), err}
+	}
+
+	c, err := t.CursorOpen(dbi)
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
+
+	// Move to the first value in the key.
+	var buf = make([]byte, 1)
+	var k = C.MDB_val{mv_size: C.size_t(len(key)), mv_data: unsafe.Pointer(&key[0])}
+	var zeroValue = C.MDB_val{mv_size: 1, mv_data: unsafe.Pointer(&buf[0])}
+
+	ret := C.mdb_cursor_get(c.MdbCursor(), &k, &zeroValue, C.MDB_cursor_op(mdb.GET_RANGE))
+	if mdb.Errno(ret) == mdb.NotFound {
+		return nil, nil
+	} else if ret != mdb.SUCCESS {
+		return nil, mdb.Errno(ret)
+	}
+
+	var values [][]byte
+	for _, v, err := c.Get(key, mdb.GET_CURRENT); err != mdb.NotFound; _, v, err = c.Get(key, mdb.GET_CURRENT) {
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, v)
+
+		// Move cursor forward.
+		if _, _, err := c.Get(key, mdb.NEXT_DUP); err == mdb.NotFound {
+			break
+		} else if err != nil {
+			return nil, &Error{"next dup error", err}
+		}
+	}
+
+	return values, nil
+}
+
 // put sets the value for a given key in a given named db.
 func (t *transaction) put(name string, key []byte, value []byte) error {
 	dbi, err := t.DBIOpen(&name, 0)
@@ -108,6 +151,18 @@ func (t *transaction) putAt(name string, key, prefix, value []byte) error {
 
 	if err := t.Put(dbi, []byte(key), value, mdb.NODUPDATA); err != nil {
 		return &Error{"putAt error", err}
+	}
+	return nil
+}
+
+// del deletes a key.
+func (t *transaction) del(name string, key []byte) error {
+	dbi, err := t.DBIOpen(&name, 0)
+	if err != nil {
+		return &Error{"dbi error", err}
+	}
+	if err := t.Del(dbi, []byte(key), nil); err != nil && err != mdb.NotFound {
+		return &Error{"del error", err}
 	}
 	return nil
 }
@@ -140,7 +195,7 @@ func (t *transaction) delAt(name string, key, prefix []byte) error {
 		}
 		return mdb.Errno(ret)
 	}
-	value := C.GoBytes(k.mv_data, C.int(k.mv_size))
+	value := C.GoBytes(v.mv_data, C.int(v.mv_size))
 	if !bytes.HasPrefix(value, prefix) {
 		return nil
 	}

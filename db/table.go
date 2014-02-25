@@ -19,9 +19,9 @@ import (
 // This is a limitation of LMDB.
 const maxKeySize = 500
 
-// cacheSize is the number of factors that are stored in the LRU cache.
+// FactorCacheSize is the number of factors that are stored in the LRU cache.
 // This cache size is per-property.
-const cacheSize = 1000
+const FactorCacheSize = 1000
 
 // Table represents a collection of objects.
 type Table struct {
@@ -171,7 +171,9 @@ func (t *Table) _open() error {
 	// Initialize the factor caches.
 	t.caches = make(map[int]*cache)
 	for _, p := range t.properties {
-		t.caches[p.ID] = newCache(cacheSize)
+		if p.DataType == Factor {
+			t.caches[p.ID] = newCache(FactorCacheSize)
+		}
 	}
 
 	return nil
@@ -330,6 +332,11 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 		return nil, err
 	}
 
+	// Initialize the cache.
+	if p.DataType == Factor {
+		t.caches[p.ID] = newCache(FactorCacheSize)
+	}
+
 	return p, nil
 }
 
@@ -424,7 +431,7 @@ func (t *Table) GetEvents(id string) ([]*Event, error) {
 		return nil, ErrTableNotOpen
 	}
 
-	// Retrieve raw events.	
+	// Retrieve raw events.
 	rawEvents, err := t.getRawEvents(id)
 	if err != nil {
 		return nil, err
@@ -561,7 +568,16 @@ func (t *Table) DeleteEvent(id string, timestamp time.Time) error {
 	if !t.opened() {
 		return ErrTableNotOpen
 	}
-	return nil // TODO
+
+	// Create the timestamp prefix.
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, shiftTime(timestamp))
+	prefix := buf.Bytes()
+
+	// Delete the event.
+	return t.txn(0, func(txn *transaction) error {
+		return txn.delAt(shardDBName(t.shardIndex(id)), []byte(id), prefix)
+	})
 }
 
 // DeleteEvents removes all events for an object.
@@ -571,7 +587,11 @@ func (t *Table) DeleteEvents(id string) error {
 	if !t.opened() {
 		return ErrTableNotOpen
 	}
-	return nil // TODO
+
+	// Delete all events.
+	return t.txn(0, func(txn *transaction) error {
+		return txn.del(shardDBName(t.shardIndex(id)), []byte(id))
+	})
 }
 
 // factorize converts a factor property value to its integer index representation.
@@ -817,14 +837,18 @@ func (t *Table) toEvent(e *rawEvent) (*Event, error) {
 		}
 
 		// Cast the value to the appropriate type.
-		v = p.Cast(v)
+		v = promote(v)
 
 		// Defactorize value, if needed.
 		if p.DataType == Factor {
 			var err error
-			v, err = t.defactorize(p.ID, int(v.(int64)))
-			if err != nil {
-				return nil, err
+			if intValue, ok := v.(int64); ok {
+				v, err = t.defactorize(p.ID, int(intValue))
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, &Error{fmt.Sprintf("invalid factor value: %v", v), nil}
 			}
 		}
 

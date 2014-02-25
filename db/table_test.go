@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -302,6 +303,17 @@ func TestTableGetEventNotOpen(t *testing.T) {
 	})
 }
 
+// Ensure that retrieving multiple events while the database is closed returns an error.
+func TestTableGetEventsNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		events, err := table.GetEvents("user1")
+		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Nil(t, events)
+	})
+}
+
 // Ensure that a table can insert an event.
 func TestTableInsertEvent(t *testing.T) {
 	withDB(func(db *DB, path string) {
@@ -348,6 +360,26 @@ func TestTableInsertEvent(t *testing.T) {
 		e, err = table.GetEvent("user1", mustParseTime("1999-01-01T00:00:00Z"))
 		assert.NoError(t, err)
 		assert.Nil(t, e)
+	})
+}
+
+// Ensure that a table can insert two overlapping events and they will be merged.
+func TestTableInsertEventMerge(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Integer, false)
+		table.CreateProperty("prop2", Factor, false)
+		table.CreateProperty("prop3", String, false)
+		table.InsertEvent("user1", newEvent("2000-01-01T00:00:00Z", "prop1", 20, "prop2", "foo", "prop3", "frank"))
+		table.InsertEvent("user1", newEvent("2000-01-01T00:00:00Z", "prop1", 30, "prop2", "bar"))
+
+		// Verify the events are merged.
+		e, err := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:00Z"))
+		if assert.NoError(t, err) && assert.NotNil(t, e) {
+			assert.Equal(t, e.Data["prop1"], int64(30))
+			assert.Equal(t, e.Data["prop2"], "bar")
+			assert.Equal(t, e.Data["prop3"], "frank")
+		}
 	})
 }
 
@@ -407,6 +439,162 @@ func TestTableInsertEvents(t *testing.T) {
 		events, err = table.GetEvents("no-such-user")
 		assert.NoError(t, err)
 		assert.Equal(t, len(events), 0)
+	})
+}
+
+// Ensure that deleting events from a closed table returns an error.
+func TestTableDeleteEventNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		err := table.DeleteEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		assert.Equal(t, err, ErrTableNotOpen)
+	})
+}
+
+// Ensure that a table can delete a single event.
+func TestTableDeleteEvent(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Integer, false)
+		table.InsertEvents("user1", []*Event{
+			newEvent("2000-01-01T00:00:00Z", "prop1", 20),
+			newEvent("2000-01-01T00:00:01Z", "prop1", 30),
+			newEvent("2000-01-01T00:00:02Z", "prop1", 30),
+		})
+		table.InsertEvents("user2", []*Event{
+			newEvent("2000-01-01T00:00:00Z", "prop1", 100),
+		})
+
+		// Delete an event from the first user.
+		table.DeleteEvent("user1", mustParseTime("2000-01-01T00:00:00Z"))
+
+		// Verify event is gone.
+		e, _ := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:00Z"))
+		assert.Nil(t, e)
+		e, _ = table.GetEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		assert.NotNil(t, e)
+		e, _ = table.GetEvent("user1", mustParseTime("2000-01-01T00:00:02Z"))
+		assert.NotNil(t, e)
+		e, _ = table.GetEvent("user2", mustParseTime("2000-01-01T00:00:00Z"))
+		assert.NotNil(t, e)
+
+		// Delete another event and verify.
+		table.DeleteEvent("user1", mustParseTime("2000-01-01T00:00:02Z"))
+		e, _ = table.GetEvent("user1", mustParseTime("2000-01-01T00:00:02Z"))
+		assert.Nil(t, e)
+
+		// Delete another event and verify.
+		table.DeleteEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		e, _ = table.GetEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		assert.Nil(t, e)
+
+		// Delete non-existent exent.
+		err := table.DeleteEvent("user1", mustParseTime("1999-01-01T00:00:00Z"))
+		assert.NoError(t, err)
+	})
+}
+
+// Ensure that deleting all events from a closed table returns an error.
+func TestTableDeleteEventsNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		err := table.DeleteEvents("user1")
+		assert.Equal(t, err, ErrTableNotOpen)
+	})
+}
+
+// Ensure that inserting events into a closed table returns an error.
+func TestTableInsertEventsNotOpen(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		db.Close()
+		err := table.InsertEvents("user1", []*Event{newEvent("2000-01-01T00:00:01Z", "prop1", 20, "prop2", "bob")})
+		assert.Equal(t, err, ErrTableNotOpen)
+	})
+}
+
+// Ensure that a table can delete all events.
+func TestTableDeleteEvents(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Integer, false)
+		table.InsertEvents("user1", []*Event{
+			newEvent("2000-01-01T00:00:00Z", "prop1", 20),
+			newEvent("2000-01-01T00:00:01Z", "prop1", 30),
+			newEvent("2000-01-01T00:00:02Z", "prop1", 30),
+		})
+		table.InsertEvents("user2", []*Event{
+			newEvent("2000-01-01T00:00:00Z", "prop1", 100),
+		})
+
+		// Delete all events for the first user.
+		table.DeleteEvents("user1")
+
+		// Verify events are gone.
+		events, err := table.GetEvents("user1")
+		assert.NoError(t, err)
+		assert.Equal(t, len(events), 0)
+
+		events, err = table.GetEvents("user2")
+		assert.NoError(t, err)
+		assert.Equal(t, len(events), 1)
+	})
+}
+
+// Ensure that a table can factorize and defactorize events correctly.
+func TestTableFactorize(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Factor, false)
+		table.CreateProperty("prop2", Factor, false)
+		table.CreateProperty("prop3", Factor, false)
+		table.InsertEvents("user1", []*Event{
+			newEvent("2000-01-01T00:00:00Z", "prop1", "foo", "prop2", "bar", "prop3", ""),
+			newEvent("2000-01-01T00:00:01Z", "prop1", "foo"),
+		})
+
+		// Verify the events.
+		e, err := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:00Z"))
+		assert.NoError(t, err)
+		assert.Equal(t, e.Data["prop1"], "foo")
+		assert.Equal(t, e.Data["prop2"], "bar")
+		assert.Equal(t, e.Data["prop3"], "")
+
+		e, err = table.GetEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
+		assert.NoError(t, err)
+		assert.Equal(t, e.Data["prop1"], "foo")
+	})
+}
+
+// Ensure that a table can factorize a large number of values beyond the cache.
+func TestTableFactorizeBeyondCache(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Factor, false)
+		table.CreateProperty("prop2", Factor, false)
+		table.CreateProperty("prop3", Factor, false)
+
+		// Insert a bunch of events.
+		startTime := mustParseTime("2000-01-01T00:00:00Z")
+		for i := 0; i < FactorCacheSize*3; i++ {
+			e := &Event{
+				Timestamp: startTime.Add(time.Duration(i) * time.Second),
+				Data:      map[string]interface{}{"prop1": strconv.Itoa(i), "prop2": strconv.Itoa(i % (FactorCacheSize * 1.5)), "prop3": "foo"},
+			}
+			table.InsertEvent("user1", e)
+		}
+
+		// Verify factor values.
+		for i := 0; i < FactorCacheSize*3; i++ {
+			e, err := table.GetEvent("user1", startTime.Add(time.Duration(i)*time.Second))
+			if assert.NoError(t, err) {
+				assert.Equal(t, e.Data["prop1"], strconv.Itoa(i))
+				assert.Equal(t, e.Data["prop2"], strconv.Itoa(i%(FactorCacheSize*1.5)))
+				assert.Equal(t, e.Data["prop3"], "foo")
+			}
+		}
 	})
 }
 
