@@ -67,8 +67,16 @@ func (r *Reducer) reduceSelectionDimensions(node *ast.Selection, h *hashmap.Hash
 			if name == "" {
 				name = decl.Name
 			}
-			if keyString, err = r.factorizer.Defactorize(name, uint64(key)); err != nil {
-				return fmt.Errorf("reduce: factor not found: %s/%d", name, uint64(key))
+
+			p, err := r.table.Property(name)
+			if err != nil {
+				return &Error{"reduce: selection error", err}
+			} else if p == nil {
+				return &Error{"reduce: property not found: " + name, nil}
+			}
+
+			if keyString, err = p.Defactorize(int(key)); err != nil {
+				return fmt.Errorf("reduce: factor not found: %s/%d", name, key)
 			}
 		case db.Boolean:
 			if key == 0 {
