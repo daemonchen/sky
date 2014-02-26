@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -595,6 +596,20 @@ func TestTableFactorizeBeyondCache(t *testing.T) {
 				assert.Equal(t, e.Data["prop3"], "foo")
 			}
 		}
+	})
+}
+
+// Ensure that a table will truncate factors to account for LMDB limitations.
+func TestTableFactorTruncate(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo")
+		table.CreateProperty("prop1", Factor, false)
+		table.InsertEvent("user1", newEvent("2000-01-01T00:00:00Z", "prop1", strings.Repeat("*", 600)))
+
+		// Verify the truncation.
+		e, err := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:00Z"))
+		assert.NoError(t, err)
+		assert.Equal(t, e.Data["prop1"], strings.Repeat("*", 500))
 	})
 }
 
