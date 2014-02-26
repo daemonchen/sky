@@ -11,7 +11,7 @@ import (
 // also be associated with another variable for the purpose of reusing
 // factorization.
 type VarDecl struct {
-	Id          int64
+	ID          int
 	Name        string
 	DataType    string
 	Association string
@@ -22,8 +22,8 @@ func (v *VarDecl) node()      {}
 func (v *VarDecl) statement() {}
 
 // NewVarDecl returns a new VarDecl instance.
-func NewVarDecl(id int64, name string, dataType string) *VarDecl {
-	return &VarDecl{Id: id, Name: name, DataType: dataType}
+func NewVarDecl(id int, name string, dataType string) *VarDecl {
+	return &VarDecl{ID: id, Name: name, DataType: dataType}
 }
 
 // Returns the index of the variable declaration. This is used internally
@@ -34,22 +34,22 @@ func (v *VarDecl) Index() int {
 
 // Determines if the variable declaration is a permanent variable.
 func (v *VarDecl) IsPermanent() bool {
-	return (v.Id > 0)
+	return (v.ID > 0)
 }
 
 // Determines if the variable declaration is a transient variable.
 func (v *VarDecl) IsTransient() bool {
-	return v.Id < 0
+	return v.ID < 0
 }
 
 // Determines if the variable declaration is a system variable.
 func (v *VarDecl) IsSystem() bool {
-	return v.Id == 0 && (len(v.Name) != 0 && v.Name[0] == '@')
+	return v.ID == 0 && (len(v.Name) != 0 && v.Name[0] == '@')
 }
 
 // Determines if the variable declaration is a declared variable.
 func (v *VarDecl) IsDeclared() bool {
-	return v.Id == 0 && !v.IsSystem()
+	return v.ID == 0 && !v.IsSystem()
 }
 
 func (v *VarDecl) String() string {

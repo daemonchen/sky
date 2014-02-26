@@ -80,3 +80,13 @@ func (p *Property) Cast(v interface{}) interface{} {
 	}
 	return v
 }
+
+// Factorize converts a value to its integer index representation.
+func (p *Property) Factorize(value string) (int, error) {
+	return p.table.Factorize(p.ID, value)
+}
+
+// Defactorize converts a factor index to its actual value.
+func (p *Property) Defactorize(index int) (string, error) {
+	return p.table.Defactorize(p.ID, index)
+}

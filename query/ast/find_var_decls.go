@@ -60,8 +60,8 @@ func (v *varDeclVisitor) add(node *VarDecl) {
 		}
 
 		var err error
-		if decl.Id != node.Id {
-			err = fmt.Errorf("Declaration error on '%s': mismatched id: %d != %d", decl.Name, decl.Id, node.Id)
+		if decl.ID != node.ID {
+			err = fmt.Errorf("Declaration error on '%s': mismatched id: %d != %d", decl.Name, decl.ID, node.ID)
 		} else if decl.DataType != node.DataType {
 			err = fmt.Errorf("Declaration error on '%s': mismatched data type: %s != %s", decl.Name, decl.DataType, node.DataType)
 		} else if decl.Association != node.Association {

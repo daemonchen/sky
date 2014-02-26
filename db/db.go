@@ -74,7 +74,7 @@ func (db *DB) close() {
 
 // CreateTable creates, opens and initializes a table.
 // Returns an error if the table already exists.
-func (db *DB) CreateTable(name string) (*Table, error) {
+func (db *DB) CreateTable(name string, shardCount int) (*Table, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -86,6 +86,7 @@ func (db *DB) CreateTable(name string) (*Table, error) {
 
 	// Create table.
 	t := db.table(name)
+	t.shardCount = shardCount
 	if err := t.create(); err != nil {
 		return nil, err
 	}

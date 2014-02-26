@@ -8,9 +8,9 @@ import (
 	"unsafe"
 
 	"github.com/axw/gollvm/llvm"
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/hashmap"
-	"github.com/szferi/gomdb"
 )
 
 var mutex sync.Mutex
@@ -26,7 +26,7 @@ func init() {
 type Mapper struct {
 	TraceEnabled bool
 
-	factorizer Factorizer
+	table *db.Table
 
 	context llvm.Context
 	module  llvm.Module
@@ -45,13 +45,13 @@ type Mapper struct {
 }
 
 // New creates a new Mapper instance.
-func New(q *ast.Query, f Factorizer) (*Mapper, error) {
+func New(q *ast.Query, t *db.Table) (*Mapper, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	m := new(Mapper)
-	m.TraceEnabled = true // FOR DEBUGGING ONLY
-	m.factorizer = f
+	// m.TraceEnabled = true // FOR DEBUGGING ONLY
+	m.table = t
 
 	m.context = llvm.NewContext()
 	m.module = m.context.NewModule("mapper")
@@ -98,8 +98,8 @@ func (m *Mapper) Close() {
 }
 
 // Execute runs the entry function on the execution engine.
-func (m *Mapper) Map(lmdb_cursor *mdb.Cursor, prefix string, result *hashmap.Hashmap) error {
-	cursor := sky_cursor_new(lmdb_cursor, prefix)
+func (m *Mapper) Map(c *db.Cursor, prefix string, result *hashmap.Hashmap) error {
+	cursor := sky_cursor_new(c.Cursor, prefix)
 	defer sky_cursor_free(cursor)
 
 	m.engine.RunFunction(m.entryFunc, []llvm.GenericValue{
@@ -110,8 +110,8 @@ func (m *Mapper) Map(lmdb_cursor *mdb.Cursor, prefix string, result *hashmap.Has
 }
 
 // Iterate simply loops over every element of the raw cursor for benchmarking purposes.
-func (m *Mapper) Iterate(c *mdb.Cursor) {
-	sky_mdb_iterate(c)
+func (m *Mapper) Iterate(c *db.Cursor) {
+	sky_mdb_iterate(c.Cursor)
 }
 
 // Dump writes the LLVM IR to STDERR.

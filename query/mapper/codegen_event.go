@@ -282,7 +282,7 @@ func (m *Mapper) codegenReadEventFunc() llvm.Value {
 	loop_read_value := m.context.AddBasicBlock(fn, "loop_read_value")
 	loop_skip := m.context.AddBasicBlock(fn, "loop_skip")
 	for _, decl := range m.decls {
-		if decl.Id != 0 {
+		if decl.ID != 0 {
 			read_decls = append(read_decls, decl)
 			read_labels = append(read_labels, m.context.AddBasicBlock(fn, decl.Name))
 		}
@@ -356,7 +356,7 @@ func (m *Mapper) codegenReadEventFunc() llvm.Value {
 	m.builder.SetInsertPointAtEnd(loop_read_value)
 	sw := m.builder.CreateSwitch(m.load(variable_id, ""), loop_skip, len(read_decls))
 	for i, decl := range read_decls {
-		sw.AddCase(llvm.ConstIntFromString(m.context.Int64Type(), fmt.Sprintf("%d", decl.Id), 10), read_labels[i])
+		sw.AddCase(llvm.ConstIntFromString(m.context.Int64Type(), fmt.Sprintf("%d", decl.ID), 10), read_labels[i])
 	}
 
 	// XXX:

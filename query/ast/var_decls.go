@@ -15,8 +15,8 @@ func (s VarDecls) Less(i, j int) bool {
 	}
 
 	// Then sort by id.
-	if s[i].Id != s[j].Id {
-		return s[i].Id < s[j].Id
+	if s[i].ID != s[j].ID {
+		return s[i].ID < s[j].ID
 	}
 
 	// Finally sort by name.

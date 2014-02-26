@@ -29,15 +29,15 @@ func TestMapperSelectCount(t *testing.T) {
 			SELECT count()
 		END
 	`
-	result, err := runDBMapper(query, ast.VarDecls{
-		ast.NewVarDecl(1, "foo", "integer"),
+	result, err := runDBMapper(query, []*db.Property{
+		{Name:"foo", DataType:db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 1, 10),
-			testevent("2000-01-01T00:00:02Z", 1, 20),
+			testevent("2000-01-01T00:00:00Z", "foo", 10),
+			testevent("2000-01-01T00:00:02Z", "foo", 20),
 		},
 		"bar": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 1, 40),
+			testevent("2000-01-01T00:00:00Z", "foo", 40),
 		},
 	})
 	assert.NoError(t, err)
@@ -52,15 +52,15 @@ func TestMapperSelectInto(t *testing.T) {
 			SELECT count() INTO "foo"
 		END
 	`
-	result, err := runDBMapper(query, ast.VarDecls{
-		ast.NewVarDecl(1, "foo", "integer"),
+	result, err := runDBMapper(query, []*db.Property{
+		{Name:"foo", DataType:db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 1, 10),
-			testevent("2000-01-01T00:00:02Z", 1, 20),
+			testevent("2000-01-01T00:00:00Z", "foo", 10),
+			testevent("2000-01-01T00:00:02Z", "foo", 20),
 		},
 		"bar": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 1, 40),
+			testevent("2000-01-01T00:00:00Z", "foo", 40),
 		},
 	})
 	assert.NoError(t, err)
@@ -77,15 +77,15 @@ func TestMapperCondition(t *testing.T) {
 			END
 		END
 	`
-	result, err := runDBMapper(query, ast.VarDecls{
-		ast.NewVarDecl(1, "foo", "integer"),
+	result, err := runDBMapper(query, []*db.Property{
+		{Name:"foo", DataType:db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 1, 10),
-			testevent("2000-01-01T00:00:02Z", 1, 20),
+			testevent("2000-01-01T00:00:00Z", "foo", 10),
+			testevent("2000-01-01T00:00:02Z", "foo", 20),
 		},
 		"bar": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 1, 40),
+			testevent("2000-01-01T00:00:00Z", "foo", 40),
 		},
 	})
 	assert.NoError(t, err)
@@ -102,15 +102,15 @@ func TestMapperFactorEquality(t *testing.T) {
 			END
 		END
 	`
-	result, err := runDBMapper(query, ast.VarDecls{
-		ast.NewVarDecl(2, "factorVariable", "factor"),
+	result, err := runDBMapper(query, []*db.Property{
+		{Name:"factorVariable", DataType:db.Factor, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 2, 1), // "XXX"
-			testevent("2000-01-01T00:00:02Z", 2, 2), // "YYY"
+			testevent("2000-01-01T00:00:00Z", "factorVariable", "XXX"), // "XXX"
+			testevent("2000-01-01T00:00:02Z", "factorVariable", "YYY"), // "YYY"
 		},
 		"bar": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 2, 1), // "XXX"
+			testevent("2000-01-01T00:00:00Z", "factorVariable", "XXX"), // "XXX"
 		},
 	})
 	assert.NoError(t, err)
@@ -127,15 +127,15 @@ func TestMapperAssignment(t *testing.T) {
 			SELECT sum(myVar)
 		END
 	`
-	result, err := runDBMapper(query, ast.VarDecls{
-		ast.NewVarDecl(2, "integerVariable", "integer"),
+	result, err := runDBMapper(query, []*db.Property{
+		{Name:"integerVariable", DataType:db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 2, 1), // myVar=1, sum=1
-			testevent("2000-01-01T00:00:02Z", 2, 2), // myVar=2, sum=3
+			testevent("2000-01-01T00:00:00Z", "integerVariable", 1),
+			testevent("2000-01-01T00:00:02Z", "integerVariable", 2),
 		},
 		"bar": []*db.Event{
-			testevent("2000-01-01T00:00:00Z", 2, 3), // myVar=1, sum=4
+			testevent("2000-01-01T00:00:00Z", "integerVariable", 3),
 		},
 	})
 	assert.NoError(t, err)
@@ -153,18 +153,18 @@ func TestMapperSessionLoop(t *testing.T) {
 		  END
 		END
 	`
-	result, err := runDBMapper(query, ast.VarDecls{
-		ast.NewVarDecl(1, "action", "factor"),
+	result, err := runDBMapper(query, []*db.Property{
+		{Name:"action", DataType:db.Factor, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
-			testevent("1970-01-01T00:00:01Z", 1, 1), // ts=1,     action=A0
-			testevent("1970-01-01T01:59:59Z", 1, 2), // ts=7199,  action=A1
-			testevent("1970-01-02T00:00:00Z", 1, 1), // ts=86400, action=A0
-			testevent("1970-01-02T02:00:00Z", 1, 2), // ts=93600, action=A1
+			testevent("1970-01-01T00:00:01Z", "action", "A0"), // ts=1
+			testevent("1970-01-01T01:59:59Z", "action", "A1"), // ts=7199
+			testevent("1970-01-02T00:00:00Z", "action", "A0"), // ts=86400
+			testevent("1970-01-02T02:00:00Z", "action", "A1"), // ts=93600
 		},
 
 		"bar": []*db.Event{
-			testevent("1970-01-02T02:00:00Z", 1, 1), // action=A0
+			testevent("1970-01-02T02:00:00Z", "action", "A0"), // action=A0
 		},
 	})
 	assert.NoError(t, err)
@@ -191,40 +191,55 @@ func testevent(timestamp string, args ...interface{}) *db.Event {
 		panic(err)
 	}
 	e := &db.Event{Timestamp: t}
-	e.Data = make(map[int64]interface{})
+	e.Data = make(map[string]interface{})
 	for i := 0; i < len(args); i += 2 {
-		key := args[i].(int)
-		e.Data[int64(key)] = args[i+1]
+		key := args[i].(string)
+		e.Data[key] = args[i+1]
 	}
 	return e
 }
 
 // Executes a query against a multiple shards and return the results.
-func withDB(objects map[string][]*db.Event, shardCount int, fn func(*db.DB) error) error {
+func withTable(properties []*db.Property, objects map[string][]*db.Event, shardCount int, fn func(*db.Table) error) error {
 	path, _ := ioutil.TempDir("", "")
 	defer os.RemoveAll(path)
 
 	db := &db.DB{}
-	if err := db.Open(path, shardCount); err != nil {
+	if err := db.Open(path); err != nil {
 		return err
 	}
 	defer db.Close()
 
-	// Insert into db.
-	if _, err := db.InsertObjects("TBL", objects); err != nil {
+	// Create table.
+	table, err := db.CreateTable("TBL", shardCount)
+	if err != nil {
+		panic("cannot create table: " + err.Error())
+	}
+
+	// Create properties.
+	for _, property := range properties {
+		p, err := table.CreateProperty(property.Name, property.DataType, property.Transient)
+		if err != nil {
+			panic("create property error: " + err.Error())
+		}
+		property.ID = p.ID
+	}
+
+	// Insert data.
+	if err := table.InsertObjects(objects); err != nil {
 		return err
 	}
 
-	if err := fn(db); err != nil {
+	if err := fn(table); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Executes a query against a given set of data and return the results.
-func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
+func runDBMapper(query string, properties []*db.Property, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
 	var h *hashmap.Hashmap
-	err := runDBMappers(1, query, decls, objects, func(db *db.DB, results []*hashmap.Hashmap) error {
+	err := runDBMappers(1, query, properties, objects, func(table *db.Table, results []*hashmap.Hashmap) error {
 		if len(results) > 0 {
 			h = results[0]
 		}
@@ -234,32 +249,17 @@ func runDBMapper(query string, decls ast.VarDecls, objects map[string][]*db.Even
 }
 
 // Executes a query against a multiple shards and return the results.
-func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[string][]*db.Event, fn func(*db.DB, []*hashmap.Hashmap) error) error {
-	err := withDB(objects, shardCount, func(db *db.DB) error {
-		// Retrieve cursors.
-		cursors, err := db.Cursors("TBL")
-		if err != nil {
-			return err
-		}
-		defer cursors.Close()
-
+func runDBMappers(shardCount int, query string, properties []*db.Property, objects map[string][]*db.Event, fn func(*db.Table, []*hashmap.Hashmap) error) error {
+	err := withTable(properties, objects, shardCount, func(table *db.Table) error {
 		// Create a query.
 		q := parser.New().MustParseString(query)
-		q.DeclaredVarDecls = append(q.DeclaredVarDecls, decls...)
+		for _, property := range properties {
+			q.DeclaredVarDecls = append(q.DeclaredVarDecls, ast.NewVarDecl(property.ID, property.Name, property.DataType))
+		}
 		q.Finalize()
 
-		// Setup factor test data.
-		f, err := db.Factorizer("TBL")
-		if err != nil {
-			return err
-		}
-		f.Factorize("action", "A0", true)
-		f.Factorize("action", "A1", true)
-		f.Factorize("factorVariable", "XXX", true)
-		f.Factorize("factorVariable", "YYY", true)
-
 		// Create a mapper generated from the query.
-		m, err := mapper.New(q, f)
+		m, err := mapper.New(q, table)
 		if err != nil {
 			return err
 		}
@@ -267,15 +267,15 @@ func runDBMappers(shardCount int, query string, decls ast.VarDecls, objects map[
 
 		// Execute the mappers.
 		results := make([]*hashmap.Hashmap, 0)
-		for _, cursor := range cursors {
+		table.ForEachShard(func (c *db.Cursor) {
 			result := hashmap.New()
-			if err = m.Map(cursor, "", result); err != nil {
-				return err
+			if err = m.Map(c, "", result); err != nil {
+				panic("map error: " + err.Error())
 			}
 			results = append(results, result)
-		}
+		})
 
-		if err := fn(db, results); err != nil {
+		if err := fn(table, results); err != nil {
 			return err
 		}
 		return nil

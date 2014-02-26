@@ -291,6 +291,7 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 
 	// Create and validate property.
 	p := &Property{
+		table: t,
 		Name:      name,
 		Transient: transient,
 		DataType:  dataType,
@@ -527,6 +528,23 @@ func (t *Table) InsertEvents(id string, events []*Event) error {
 	return nil
 }
 
+// InsertObjects inserts multiple sets of events for different objects.
+func (t *Table) InsertObjects(objects map[string][]*Event) error {
+	t.Lock()
+	defer t.Unlock()
+	if !t.opened() {
+		return ErrTableNotOpen
+	}
+	for id, events := range objects {
+		for _, event := range events {
+			if err := t.insertEvent(id, event); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (t *Table) insertEvent(id string, e *Event) error {
 	// Convert to raw event.
 	rawEvent, err := t.toRawEvent(e)
@@ -592,6 +610,42 @@ func (t *Table) DeleteEvents(id string) error {
 	return t.txn(0, func(txn *transaction) error {
 		return txn.del(shardDBName(t.shardIndex(id)), []byte(id))
 	})
+}
+
+// ForEachShard executes a function once for each shard in the table.
+// A different cursor is passed in for each function invocation.
+func (t *Table) ForEachShard(fn func(c *Cursor)) error {
+	if !t.opened() {
+		return ErrTableNotOpen
+	}
+	for i := 0; i < t.shardCount; i++ {
+		txn, err := t.env.BeginTxn(nil, mdb.RDONLY)
+		if err != nil {
+			return &Error{"foreach txn error", err}
+		}
+
+		shardDBName := shardDBName(i)
+		dbi, err := txn.DBIOpen(&shardDBName, 0)
+		if err != nil {
+			return &Error{"foreach dbi error", err}
+		}
+
+		c, err := txn.CursorOpen(dbi)
+		if err != nil {
+			return &Error{"foreach cursor error", err}
+		}
+
+		fn(&Cursor{c})
+	}
+
+	return nil
+}
+
+// Factorize converts a factor property value to its integer index representation.
+func (t *Table) Factorize(propertyID int, value string) (int, error) {
+	t.Lock()
+	defer t.Unlock()
+	return t.factorize(propertyID, value, false)
 }
 
 // factorize converts a factor property value to its integer index representation.
@@ -676,6 +730,13 @@ func (t *Table) addFactor(propertyID int, value string) (int, error) {
 	t.caches[propertyID].add(value, index)
 
 	return index, nil
+}
+
+// Defactorize converts a factor index to its actual value.
+func (t *Table) Defactorize(propertyID int, index int) (string, error) {
+	t.Lock()
+	defer t.Unlock()
+	return t.defactorize(propertyID, index)
 }
 
 // defactorize converts a factor index to its string value.
@@ -765,6 +826,7 @@ func (t *Table) unmarshal(data []byte) error {
 	t.properties = make(map[string]*Property)
 	t.propertiesByID = make(map[int]*Property)
 	for _, p := range msg.Properties {
+		p.table = t
 		t.properties[p.Name] = p
 		t.propertiesByID[p.ID] = p
 	}
@@ -914,4 +976,14 @@ func (e *rawEvent) normalize() {
 	for k, v := range e.data {
 		e.data[k] = promote(v)
 	}
+}
+
+type Cursor struct {
+	*mdb.Cursor
+}
+
+func (c *Cursor) Close() {
+	txn := c.Txn()
+	c.Cursor.Close()
+	txn.Commit()
 }

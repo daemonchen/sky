@@ -149,7 +149,16 @@ func (m *Mapper) codegenFactorEquality(node *ast.BinaryExpression, lhs *ast.VarR
 			name = decl.Name
 		}
 
-		id, err := m.factorizer.Factorize(name, rhs.Value, false)
+		// Find property on table.
+		p, err := m.table.Property(name)
+		if err != nil {
+			return nilValue, err
+		} else if p == nil {
+			return nilValue, &Error{"variable not found: " + name, nil}
+		}
+
+		// Factorize value.
+		id, err := p.Factorize(rhs.Value)
 		if err == db.ErrFactorNotFound {
 			return nilValue, err
 		}
