@@ -379,7 +379,7 @@ func TestServerDuplicateSelectionQuery(t *testing.T) {
 }
 
 // Ensure that we can run basic stats.
-func TestServerStatsQuery(t *testing.T) {
+func TestServerQueryCount(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "price", true, "integer")
@@ -392,7 +392,8 @@ func TestServerStatsQuery(t *testing.T) {
 			[]string{"0030a", "2012-01-01T00:00:00Z", `{"data":{"price":40}}`},
 		})
 
-		resp, _ := sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/stats?prefix=001", "application/json", "")
-		assertResponse(t, resp, 200, `{"count":3}`+"\n", "POST /tables/:name/query failed.")
+		code, resp := getJSON("/tables/foo/count?prefix=001")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `{"count":3}`)
 	})
 }

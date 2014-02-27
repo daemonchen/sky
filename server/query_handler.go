@@ -23,7 +23,7 @@ type queryHandler struct {
 func installQueryHandler(s *Server) *queryHandler {
 	h := &queryHandler{s: s}
 	s.HandleFunc("/tables/{table}/query", EnsureTableHandler(HandleFunc(h.query))).Methods("POST")
-	s.HandleFunc("/tables/{table}/stats", EnsureTableHandler(HandleFunc(h.stats))).Methods("GET")
+	s.HandleFunc("/tables/{table}/count", EnsureTableHandler(HandleFunc(h.count))).Methods("GET")
 	return h
 }
 
@@ -43,8 +43,8 @@ func (h *queryHandler) query(s *Server, req Request) (interface{}, error) {
 	return h.execute(s, req, querystring)
 }
 
-// stats executes a simple event count against the given table.
-func (h *queryHandler) stats(s *Server, req Request) (interface{}, error) {
+// count executes a simple event count against the given table.
+func (h *queryHandler) count(s *Server, req Request) (interface{}, error) {
 	return h.execute(s, req, "SELECT count()")
 }
 

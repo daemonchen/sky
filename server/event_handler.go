@@ -61,9 +61,9 @@ func (h *eventHandler) insertEvent(s *Server, req Request) (interface{}, error) 
 	}
 
 	// Create the event.
-	e := &db.Event{
-		Timestamp: timestamp,
-		Data: req.Data().(map[string]interface{}),
+	e := &db.Event{Timestamp: timestamp}
+	if root, ok := req.Data().(map[string]interface{}); ok {
+		e.Data, _ = root["data"].(map[string]interface{})
 	}
 
 	// Insert the event.

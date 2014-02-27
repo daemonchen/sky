@@ -28,7 +28,7 @@ type ensureTableHandler struct {
 }
 
 func (h *ensureTableHandler) Serve(s *Server, req Request) (interface{}, error) {
-	t, err := s.OpenTable(req.Var("table"))
+	t, err := s.db.OpenTable(req.Var("table"))
 	if err != nil {
 		return nil, err
 	}

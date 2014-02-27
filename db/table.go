@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 
@@ -652,6 +653,21 @@ func (t *Table) ForEach(fn func(c *Cursor)) error {
 	return nil
 }
 
+// Keys returns all object keys in the table in sorted order.
+func (t *Table) Keys() ([]string, error) {
+	var keys = make([]string, 0)
+	err := t.ForEach(func(c *Cursor) {
+		for k, _, err := c.Get(nil, mdb.NEXT_NODUP); err != mdb.NotFound; k, _, err = c.Get(nil, mdb.NEXT_NODUP) {
+			keys = append(keys, string(k))
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
 // Factorize converts a factor property value to its integer index representation.
 func (t *Table) Factorize(propertyID int, value string) (int, error) {
 	t.Lock()
@@ -814,6 +830,32 @@ func truncateFactor(value string) string {
 	return value
 }
 
+// Stat returns statistics for the table's underlying LMDB environment.
+func (t *Table) Stat() (*Stat, error) {
+	stat, err := t.env.Stat()
+	if err != nil {
+		return nil, err
+	}
+	info, err := t.env.Info()
+	if err != nil {
+		return nil, err
+	}
+	s := &Stat{
+		Entries: stat.Entries,
+		Size:    info.MapSize,
+		Depth:   stat.Depth,
+	}
+	s.Transactions.Last = info.LastTxnID
+	s.Readers.Max = info.MaxReaders
+	s.Readers.Current = info.NumReaders
+	s.Pages.Last = info.LastPNO
+	s.Pages.Size = stat.PSize
+	s.Pages.Branch = stat.BranchPages
+	s.Pages.Leaf = stat.LeafPages
+	s.Pages.Overflow = stat.OwerflowPages
+	return s, nil
+}
+
 // marshal encodes the table into a byte slice.
 func (t *Table) marshal() ([]byte, error) {
 	var msg = tableRawMessage{Name: t.name, ShardCount: t.shardCount, MaxPermanentID: t.maxPermanentID, MaxTransientID: t.maxTransientID}
@@ -941,8 +983,8 @@ type tableRawMessage struct {
 
 // Event represents the state for an object at a given point in time.
 type Event struct {
-	Timestamp time.Time
-	Data      map[string]interface{}
+	Timestamp time.Time `json:"timestamp"`
+	Data      map[string]interface{} `json:"data"`
 }
 
 // rawEvent represents an internal event structure.
@@ -987,6 +1029,27 @@ func (e *rawEvent) normalize() {
 	for k, v := range e.data {
 		e.data[k] = promote(v)
 	}
+}
+
+// Stat represents statistics for a single table.
+type Stat struct {
+	Entries      uint64 `json:"entries"` // Number of data items
+	Size         uint64 `json:"size"`    // Size of the data memory map
+	Depth        uint   `json:"depth"`   // Depth (height) of the B-tree
+	Transactions struct {
+		Last uint64 `json:"last"` // ID of the last committed transaction
+	} `json:"transactions"`
+	Readers struct {
+		Max     uint `json:"max"`     // maximum number of threads for the environment
+		Current uint `json:"current"` // maximum number of threads used in the environment
+	} `json:"readers"`
+	Pages struct {
+		Last     uint64 `json:"last"`     // ID of the last used page
+		Size     uint   `json:"size"`     // Size of a database page. This is currently the same for all databases.
+		Branch   uint64 `json:"branch"`   // Number of internal (non-leaf) pages
+		Leaf     uint64 `json:"leaf"`     // Number of leaf pages
+		Overflow uint64 `json:"overflow"` // Number of overflow pages
+	} `json:"pages"`
 }
 
 type Cursor struct {

@@ -15,7 +15,7 @@ func TestServerEventUpdate(t *testing.T) {
 		setupTestProperty("foo", "baz", true, "integer")
 
 		// Send two new events.
-		code, _ := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00.123456111Z", `{"data":{"bar":"myValue", "baz":12}}`)
+		code, resp := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00.123456111Z", `{"data":{"bar":"myValue", "baz":12}}`)
 		assert.Equal(t, code, 200)
 		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", `{"data":{"bar":"myValue2"}}`)
 		assert.Equal(t, code, 200)
@@ -51,7 +51,7 @@ func TestServerInsertEventTooLarge(t *testing.T) {
 		// Send one large event (600 character string).
 		code, resp := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", `{"data":{"bar":"012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"}}`)
 		assert.Equal(t, code, 500)
-		assert.Equal(t, jsonenc(resp), `{"message":"shard txn put error: MDB_BAD_VALSIZE: Too big key/data, key is empty, or wrong DUPFIXED size"}`)
+		assert.Equal(t, jsonenc(resp), `{"message":"txn error: MDB_BAD_VALSIZE: Too big key/data, key is empty, or wrong DUPFIXED size"}`)
 	})
 }
 
@@ -62,18 +62,19 @@ func TestServerEventDelete(t *testing.T) {
 		setupTestProperty("foo", "bar", false, "string")
 
 		// Send two new events.
-		resp, _ := sendTestHttpRequest("PUT", "http://localhost:8586/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", "application/json", `{"data":{"bar":"myValue"}}`)
-		assertResponse(t, resp, 200, "", "PUT /tables/:name/objects/:objectId/events failed.")
-		resp, _ = sendTestHttpRequest("PUT", "http://localhost:8586/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", "application/json", `{"data":{"bar":"myValue2"}}`)
-		assertResponse(t, resp, 200, "", "PUT /tables/:name/objects/:objectId/events failed.")
+		code, resp := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", `{"data":{"bar":"myValue"}}`)
+		assert.Equal(t, code, 200)
+		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", `{"data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 200)
 
 		// Delete one of the events.
-		resp, _ = sendTestHttpRequest("DELETE", "http://localhost:8586/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", "application/json", "")
-		assertResponse(t, resp, 200, "", "DELETE /tables/:name/objects/:objectId/events failed.")
+		code, _ = deleteJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", ``)
+		assert.Equal(t, code, 200)
 
 		// Check our work.
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/objects/xyz/events", "application/json", "")
-		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /tables/:name/objects/:objectId/events failed.")
+		code, resp = getJSON("/tables/foo/objects/xyz/events")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
 	})
 }
 
@@ -84,18 +85,19 @@ func TestServerDeleteEvents(t *testing.T) {
 		setupTestProperty("foo", "bar", false, "string")
 
 		// Send two new events.
-		resp, _ := sendTestHttpRequest("PUT", "http://localhost:8586/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", "application/json", `{"data":{"bar":"myValue"}}`)
-		assertResponse(t, resp, 200, "", "PUT /tables/:name/objects/:objectId/events failed.")
-		resp, _ = sendTestHttpRequest("PUT", "http://localhost:8586/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", "application/json", `{"data":{"bar":"myValue2"}}`)
-		assertResponse(t, resp, 200, "", "PUT /tables/:name/objects/:objectId/events failed.")
+		code, resp := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", `{"data":{"bar":"myValue"}}`)
+		assert.Equal(t, code, 200)
+		code, _ = putJSON("/tables/foo/objects/xyz/events/2012-01-01T03:00:00Z", `{"data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 200)
 
 		// Delete the events.
-		resp, _ = sendTestHttpRequest("DELETE", "http://localhost:8586/tables/foo/objects/xyz/events", "application/json", "")
-		assertResponse(t, resp, 200, "", "DELETE /tables/:name/objects/:objectId/events failed.")
+		code, _ = deleteJSON("/tables/foo/objects/xyz/events", ``)
+		assert.Equal(t, code, 200)
 
 		// Check our work.
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/objects/xyz/events", "application/json", "")
-		assertResponse(t, resp, 200, "[]\n", "GET /tables/:name/objects/:objectId/events failed.")
+		code, resp = getJSON("/tables/foo/objects/xyz/events")
+		assert.Equal(t, code, 200)
+		assert.Nil(t, resp)
 	})
 }
 
@@ -107,12 +109,14 @@ func TestServerStreamUpdateEvents(t *testing.T) {
 		setupTestProperty("foo", "baz", true, "integer")
 
 		// Send two new events in one request.
-		resp, _ := sendTestHttpRequest("PATCH", "http://localhost:8586/tables/foo/events", "application/json", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assertResponse(t, resp, 200, `{"events_written":2}`, "PATCH /tables/:name/events failed.")
+		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `{"events_written":2}`)
 
 		// Check our work.
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/objects/xyz/events", "application/json", "")
-		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /tables/:name/objects/:objectId/events failed.")
+		code, resp = getJSON("/tables/foo/objects/xyz/events")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
 	})
 }
 
@@ -128,13 +132,17 @@ func TestServerStreamUpdateEventsTableAgnostic(t *testing.T) {
 		setupTestProperty("foo_2", "baz", true, "integer")
 
 		// Send two new events in one request.
-		resp, _ := sendTestHttpRequest("PATCH", "http://localhost:8586/events", "application/json", `{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assertResponse(t, resp, 200, `{"events_written":4}`, "PATCH /events failed.")
+		code, resp := patchJSON("/events", `{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `{"events_written":4}`)
 
 		// Check our work.
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo_1/objects/xyz/events", "application/json", "")
-		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /tables/:name/objects/:objectId/events failed.")
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo_2/objects/xyz/events", "application/json", "")
-		assertResponse(t, resp, 200, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`+"\n", "GET /tables/:name/objects/:objectId/events failed.")
+		code, resp = getJSON("/tables/foo_1/objects/xyz/events")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
+
+		code, resp = getJSON("/tables/foo_2/objects/xyz/events")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
 	})
 }

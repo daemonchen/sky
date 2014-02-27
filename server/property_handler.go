@@ -1,6 +1,8 @@
 package server
 
 import (
+	"sort"
+	
 	"github.com/skydb/sky/db"
 )
 
@@ -25,10 +27,11 @@ func (h *propertyHandler) getProperties(s *Server, req Request) (interface{}, er
 		return nil, err
 	}
 
-	var slice = make([]*db.Property, 0, len(properties))
+	var slice = make(db.PropertySlice, 0, len(properties))
 	for _, p := range properties {
 		slice = append(slice, p)
 	}
+	sort.Sort(slice)
 	return slice, nil
 }
 

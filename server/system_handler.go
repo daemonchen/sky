@@ -8,7 +8,6 @@ func installSystemHandler(s *Server) *systemHandler {
 	h := &systemHandler{}
 	s.HandleFunc("/", HandleFunc(h.root)).Methods("GET")
 	s.HandleFunc("/ping", HandleFunc(h.ping)).Methods("GET")
-	s.HandleFunc("/stats", HandleFunc(h.stats)).Methods("GET")
 	return h
 }
 
@@ -22,7 +21,3 @@ func (h *systemHandler) ping(s *Server, req Request) (interface{}, error) {
 	return map[string]interface{}{"message": "ok"}, nil
 }
 
-// stats returns LMDB stats.
-func (h *systemHandler) stats(s *Server, req Request) (interface{}, error) {
-	return s.db.Stats()
-}

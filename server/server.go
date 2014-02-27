@@ -137,15 +137,9 @@ func (s *Server) Running() bool {
 func (s *Server) open() error {
 	s.close()
 
-	// Setup the file system if it doesn't exist.
-	err := s.createIfNotExists()
-	if err != nil {
-		return fmt.Errorf("skyd.Server: Unable to create server folders: %v", err)
-	}
-
 	// Initialize and open database.
 	s.db = &db.DB{}
-	if err = s.db.Open(s.path, 0); err != nil {
+	if err := s.db.Open(s.path); err != nil {
 		s.close()
 		return err
 	}
@@ -161,55 +155,9 @@ func (s *Server) close() {
 	}
 }
 
-// Creates the appropriate directory structure if one does not exist.
-func (s *Server) createIfNotExists() error {
-	// Create root directory.
-	err := os.MkdirAll(s.path, 0700)
-	if err != nil {
-		return err
-	}
-
-	// Create tables directory.
-	err = os.MkdirAll(s.TablesPath(), 0700)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Silences the log.
 func (s *Server) Silence() {
 	s.logger = log.New(ioutil.Discard, "", log.LstdFlags)
-}
-
-// Retrieves a table that has already been opened.
-func (s *Server) GetTable(name string) *db.Table {
-	s.Lock()
-	defer s.Unlock()
-	return s.tables[name]
-}
-
-// Opens a table and returns a reference to it.
-func (s *Server) OpenTable(name string) (*db.Table, error) {
-	// If table already exists then use it.
-	table := s.GetTable(name)
-	if table != nil {
-		return table, nil
-	}
-
-	// Otherwise open it and save the reference.
-	table = &db.Table{Name: name}
-	if err := table.Open(s.TablePath(name)); err != nil {
-		table.Close()
-		return nil, err
-	}
-
-	s.Lock()
-	s.tables[name] = table
-	s.Unlock()
-
-	return table, nil
 }
 
 // HandleFunc serializes and deserializes incoming requests before passing off to Gorilla.

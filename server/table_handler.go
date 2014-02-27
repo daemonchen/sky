@@ -1,12 +1,7 @@
 package server
 
 import (
-	"fmt"
 	"io/ioutil"
-	"sort"
-
-	"github.com/skydb/sky/db"
-	"github.com/szferi/gomdb"
 )
 
 // tableHandler handles the management of tables in the database.
@@ -20,21 +15,22 @@ func installTableHandler(s *Server) *tableHandler {
 	s.HandleFunc("/tables/{table}", EnsureTableHandler(HandleFunc(h.getTable))).Methods("GET")
 	s.HandleFunc("/tables/{table}", EnsureTableHandler(HandleFunc(h.deleteTable))).Methods("DELETE")
 	s.HandleFunc("/tables/{table}/keys", EnsureTableHandler(HandleFunc(h.getKeys))).Methods("GET")
+	s.HandleFunc("/tables/{table}/stats", EnsureTableHandler(HandleFunc(h.stats))).Methods("GET")
 	return h
 }
 
 // getTables retrieves metadata for all tables.
 func (h *tableHandler) getTables(s *Server, req Request) (interface{}, error) {
 	// Create a table object for each directory in the tables path.
-	infos, err := ioutil.ReadDir(s.TablesPath())
+	infos, err := ioutil.ReadDir(s.db.Path())
 	if err != nil {
 		return nil, err
 	}
 
-	tables := []*db.Table{}
+	tables := make([]*tableMessage, 0)
 	for _, info := range infos {
 		if info.IsDir() {
-			tables = append(tables, &db.Table{Name: info.Name()})
+			tables = append(tables, &tableMessage{Name: info.Name()})
 		}
 	}
 
@@ -43,60 +39,38 @@ func (h *tableHandler) getTables(s *Server, req Request) (interface{}, error) {
 
 // getTable retrieves metadata for a single table.
 func (h *tableHandler) getTable(s *Server, req Request) (interface{}, error) {
-	return req.Table(), nil
+	t := req.Table()
+	return &tableMessage{Name: t.Name()}, nil
 }
 
 // createTable creates a new table.
 func (h *tableHandler) createTable(s *Server, req Request) (interface{}, error) {
 	data := req.Data().(map[string]interface{})
 	name, _ := data["name"].(string)
-	if table, _ := s.OpenTable(name); table != nil {
-		return nil, fmt.Errorf("server: table already exists: %s", name)
-	}
-
-	t := &db.Table{Name: name}
-	if err := t.Create(s.TablePath(name)); err != nil {
+	t, err := s.db.CreateTable(name, 0)
+	if err != nil {
 		return nil, err
 	}
-	return t, nil
+	return &tableMessage{Name: t.Name()}, nil
 }
 
 // deleteTable deletes a single table.
 func (h *tableHandler) deleteTable(s *Server, req Request) (interface{}, error) {
 	t := req.Table()
-	if err := s.db.Drop(t.Name); err != nil {
-		return nil, err
-	}
-
-	// Remove the table from the lookup and remove it.
-	s.Lock()
-	delete(s.tables, t.Name)
-	defer s.Unlock()
-
-	return nil, t.Delete()
+	return nil, s.db.DropTable(t.Name())
 }
 
 // getKeys retrieves all object keys for a table.
 func (h *tableHandler) getKeys(s *Server, req Request) (interface{}, error) {
-	t := req.Table()
-	cursors, err := s.db.Cursors(t.Name)
-	if err != nil {
-		return nil, err
-	}
-	defer cursors.Close()
+	return req.Table().Keys()
+}
 
-	keys := []string{}
-	for _, c := range cursors {
-		for {
-			// Retrieve main key value.
-			bkey, _, err := c.Get(nil, mdb.NEXT_NODUP)
-			if err != nil {
-				break
-			}
-			keys = append(keys, string(bkey))
-		}
-	}
-	sort.Strings(keys)
+// stats returns LMDB stats for a given table.
+func (h *tableHandler) stats(s *Server, req Request) (interface{}, error) {
+	return req.Table().Stat()
+}
 
-	return keys, nil
+
+type tableMessage struct {
+	Name string `json:"name"`
 }

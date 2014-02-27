@@ -2,73 +2,81 @@ package server
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Ensure that we can create a property through the server.
-func TestServerCreateProperty(t *testing.T) {
+func TestServerPropertyCreate(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
-		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/properties", "application/json", `{"name":"bar", "transient":false, "dataType":"string"}`)
-		assertResponse(t, resp, 200, `{"id":1,"name":"bar","transient":false,"dataType":"string"}`+"\n", "POST /tables/:name/properties failed.")
+		code, resp := postJSON("/tables/foo/properties", `{"name":"bar", "transient":false, "dataType":"string"}`)
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `{"dataType":"string","id":1,"name":"bar","transient":false}`)
 	})
 }
 
 // Ensure that we can retrieve all properties through the server.
-func TestServerGetProperties(t *testing.T) {
+func TestServerPropertyGetAll(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "bar", false, "string")
 		setupTestProperty("foo", "baz", true, "integer")
-		resp, _ := sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/properties", "application/json", "")
-		assertResponse(t, resp, 200, `[{"id":-1,"name":"baz","transient":true,"dataType":"integer"},{"id":1,"name":"bar","transient":false,"dataType":"string"}]`+"\n", "GET /tables/:name/properties failed.")
+		code, resp := getJSON("/tables/foo/properties")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[{"dataType":"integer","id":-1,"name":"baz","transient":true},{"dataType":"string","id":1,"name":"bar","transient":false}]`)
 	})
 }
 
 // Ensure that we can retrieve a single property through the server.
-func TestServerGetProperty(t *testing.T) {
+func TestServerPropertyGet(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "bar", false, "string")
 		setupTestProperty("foo", "baz", true, "integer")
-		resp, _ := sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/properties/bar", "application/json", "")
-		assertResponse(t, resp, 200, `{"id":1,"name":"bar","transient":false,"dataType":"string"}`+"\n", "GET /tables/:name/properties/:propertyName failed.")
+		code, resp := getJSON("/tables/foo/properties/bar")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `{"dataType":"string","id":1,"name":"bar","transient":false}`)
 	})
 }
 
 // Ensure that we can update a property name through the server.
-func TestServerUpdateProperty(t *testing.T) {
+func TestServerPropertyUpdate(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "bar", false, "string")
 		setupTestProperty("foo", "baz", true, "integer")
-		resp, _ := sendTestHttpRequest("PATCH", "http://localhost:8586/tables/foo/properties/bar", "application/json", `{"name":"bat"}`)
-		assertResponse(t, resp, 200, `{"id":1,"name":"bat","transient":false,"dataType":"string"}`+"\n", "PATCH /tables/:name/properties/:propertyName failed.")
+		code, resp := patchJSON("/tables/foo/properties/bar", `{"name":"bat"}`)
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `{"dataType":"string","id":1,"name":"bat","transient":false}`)
 	})
 }
 
 // Ensure that we can delete a property on the server.
-func TestServerDeleteProperty(t *testing.T) {
+func TestServerPropertyDelete(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "bar", false, "string")
 		setupTestProperty("foo", "baz", true, "integer")
-		resp, _ := sendTestHttpRequest("DELETE", "http://localhost:8586/tables/foo/properties/bar", "application/json", "")
-		assertResponse(t, resp, 200, "", "DELETE /tables/:name/properties/:propertyName failed.")
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/properties", "application/json", "")
-		assertResponse(t, resp, 200, `[{"id":-1,"name":"baz","transient":true,"dataType":"integer"}]`+"\n", "GET /tables/:name/properties after delete failed.")
+		code, resp := deleteJSON("/tables/foo/properties/bar", ``)
+		assert.Equal(t, code, 200)
+		code, resp = getJSON("/tables/foo/properties")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[{"dataType":"integer","id":-1,"name":"baz","transient":true}]`)
 	})
 }
 
 // Ensure that we can delete a renamed property on the server.
-func TestServerDeleteRenamedProperty(t *testing.T) {
+func TestServerPropertyRenameAndDelete(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "bar", false, "string")
-		resp, _ := sendTestHttpRequest("PATCH", "http://localhost:8586/tables/foo/properties/bar", "application/json", `{"name":"bar2"}`)
-		assertResponse(t, resp, 200, `{"id":1,"name":"bar2","transient":false,"dataType":"string"}`+"\n", "PATCH /tables/:name/properties/:propertyName failed.")
-		resp, _ = sendTestHttpRequest("DELETE", "http://localhost:8586/tables/foo/properties/bar2", "application/json", "")
-		assertResponse(t, resp, 200, "", "DELETE /tables/:name/properties/:propertyName failed.")
-		resp, _ = sendTestHttpRequest("GET", "http://localhost:8586/tables/foo/properties", "application/json", "")
-		assertResponse(t, resp, 200, `[]`+"\n", "GET /tables/:name/properties after delete failed.")
+		code, resp := patchJSON("/tables/foo/properties/bar", `{"name":"bar2"}`)
+		assert.Equal(t, code, 200)
+		code, resp = deleteJSON("/tables/foo/properties/bar2", ``)
+		assert.Equal(t, code, 200)
+		code, resp = getJSON("/tables/foo/properties")
+		assert.Equal(t, code, 200)
+		assert.Equal(t, jsonenc(resp), `[]`)
 	})
 }

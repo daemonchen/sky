@@ -90,3 +90,9 @@ func (p *Property) Factorize(value string) (int, error) {
 func (p *Property) Defactorize(index int) (string, error) {
 	return p.table.Defactorize(p.ID, index)
 }
+
+// PropertySlice represents a list of properties that can be sorted by ID.
+type PropertySlice []*Property
+func (s PropertySlice) Len() int           { return len(s) }
+func (s PropertySlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s PropertySlice) Less(i, j int) bool { return s[i].ID < s[j].ID }

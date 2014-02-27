@@ -6,6 +6,8 @@ import (
 
 // Ensure that we can merge one object timeline to another.
 func TestServerMergeObject(t *testing.T) {
+	t.Skip("PENDING")
+
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "name", false, "factor")
@@ -36,6 +38,7 @@ func TestServerMergeObject(t *testing.T) {
 
 // Ensure a merge from a non-existent source object is ignored.
 func TestServerMergeNonExistentSourceObject(t *testing.T) {
+	t.Skip("PENDING")
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "num", true, "integer")
@@ -51,6 +54,7 @@ func TestServerMergeNonExistentSourceObject(t *testing.T) {
 
 // Ensure a merge from a non-existent destination object works.
 func TestServerMergeNonExistentDestinationObject(t *testing.T) {
+	t.Skip("PENDING")
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "num", true, "integer")
@@ -70,6 +74,7 @@ func TestServerMergeNonExistentDestinationObject(t *testing.T) {
 
 // Ensure that we cannot merge an object into itself.
 func TestServerMergeSameObjectNotAllowed(t *testing.T) {
+	t.Skip("PENDING")
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/objects/a/merge", "application/json", `{"id":"a"}`)
