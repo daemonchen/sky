@@ -13,6 +13,15 @@ var (
 // SecondsBitOffset is the number of bits used to store subseconds in Sky time.
 const SecondsBitOffset = 20
 
+// ParseTime parses an ISO-8601 timestamp into Go time.
+func ParseTime(s string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return t, ErrInvalidTimestamp
+	}
+	return t.UTC(), nil
+}
+
 // shiftTime converts Go time into a Sky timestamp.
 func shiftTime(value time.Time) int64 {
 	timestamp := value.UnixNano() / 1000

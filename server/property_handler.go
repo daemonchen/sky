@@ -1,5 +1,9 @@
 package server
 
+import (
+	"github.com/skydb/sky/db"
+)
+
 // propertyHandler handles the management of tables in the database.
 type propertyHandler struct{}
 
@@ -16,7 +20,16 @@ func installPropertyHandler(s *Server) *propertyHandler {
 
 // getProperties retrieves all properties from a table.
 func (h *propertyHandler) getProperties(s *Server, req Request) (interface{}, error) {
-	return req.Table().GetProperties()
+	properties, err := req.Table().Properties()
+	if err != nil {
+		return nil, err
+	}
+
+	var slice = make([]*db.Property, 0, len(properties))
+	for _, p := range properties {
+		slice = append(slice, p)
+	}
+	return slice, nil
 }
 
 // createProperty creates a new property on a table.
@@ -25,7 +38,7 @@ func (h *propertyHandler) createProperty(s *Server, req Request) (interface{}, e
 	name, _ := data["name"].(string)
 	transient, _ := data["transient"].(bool)
 	dataType, _ := data["dataType"].(string)
-	return req.Table().CreateProperty(name, transient, dataType)
+	return req.Table().CreateProperty(name, dataType, transient)
 }
 
 // getProperty retrieves a property from a table by name.
@@ -41,5 +54,5 @@ func (h *propertyHandler) updateProperty(s *Server, req Request) (interface{}, e
 
 // deleteProperty removes a property from a table.
 func (h *propertyHandler) deleteProperty(s *Server, req Request) (interface{}, error) {
-	return nil, req.Table().DeleteProperty(req.Property())
+	return nil, req.Table().DeleteProperty(req.Property().Name)
 }

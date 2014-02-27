@@ -21,10 +21,10 @@ func (h *objectHandler) mergeObjects(s *Server, req Request) (interface{}, error
 	destId := req.Var("id")
 	srcId, ok := data["id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("server: invalid source id: %v", data["id"])
+		return nil, fmt.Errorf("invalid source id: %v", data["id"])
 	} else if destId == srcId {
-		return nil, fmt.Errorf("server: cannot merge an object into itself")
+		return nil, fmt.Errorf("cannot merge an object into itself")
 	}
 
-	return nil, s.db.Merge(t.Name, destId, srcId)
+	return nil, t.Merge(destId, srcId)
 }

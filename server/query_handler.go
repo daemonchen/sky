@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/skydb/sky/db"
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/ast/validator"
 	"github.com/skydb/sky/query/hashmap"
@@ -70,11 +71,11 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 		return nil, err
 	}
 	q.DynamicDecl = func(ref *ast.VarRef) *ast.VarDecl {
-		p, _ := t.GetPropertyByName(ref.Name)
+		p, _ := t.Property(ref.Name)
 		if p == nil {
 			return nil
 		}
-		return ast.NewVarDecl(p.Id, p.Name, p.DataType)
+		return ast.NewVarDecl(p.ID, p.Name, p.DataType)
 	}
 	ast.Normalize(q)
 	if err := q.Finalize(); err != nil {
@@ -90,21 +91,10 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 
 	t0 = bench("query.validate", t0)
 
-	// Retrieve factorizer and database cursors.
-	f, err := s.db.Factorizer(t.Name)
-	if err != nil {
-		return nil, err
-	}
-	cursors, err := s.db.Cursors(t.Name)
-	if err != nil {
-		return nil, err
-	}
-	defer cursors.Close()
-
 	// TODO(benbjohnson): Add Mapper.Clone() and run each shard separately.
 
 	// Generate mapper code.
-	m, err := mapper.New(q, f)
+	m, err := mapper.New(q, t)
 	if err != nil {
 		return nil, err
 	}
@@ -113,16 +103,13 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 
 	t0 = bench("query.codegen", t0)
 
-	m.Iterate(cursors[0])
-	t0 = bench("query.iterate", t0)
-
 	// Execute one mapper for each cursor.
 	t1 := bench("map")
-	count := len(cursors)
-	results := make(chan interface{}, count)
-	for _, cursor := range cursors {
+	results := make(chan interface{}, t.ShardCount())
+	t.ForEach(func(cursor *db.Cursor) {
 		wg.Add(1)
 		//go func(cursor *mdb.Cursor) {
+		defer cursor.Close()
 		result := hashmap.New()
 		if err := m.Map(cursor, prefix, result); err == nil {
 			results <- result
@@ -132,7 +119,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 		bench("map", t1)
 		wg.Done()
 		//}(cursor)
-	}
+	})
 
 	// Don't exit function until all mappers finish.
 	defer wg.Wait()
@@ -145,7 +132,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 
 	// Combine all the results into one final result.
 	err = nil
-	r := reducer.New(q, f)
+	r := reducer.New(q, t)
 	for result := range results {
 		switch result := result.(type) {
 		case *hashmap.Hashmap:

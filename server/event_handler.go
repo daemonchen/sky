@@ -1,13 +1,8 @@
 package server
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/skydb/sky/db"
 )
 
@@ -38,92 +33,58 @@ func installEventHandler(s *Server) *eventHandler {
 // getEvents retrieves a list of all events associated with an object.
 func (h *eventHandler) getEvents(s *Server, req Request) (interface{}, error) {
 	t := req.Table()
-	events, err := s.db.GetEvents(t.Name, req.Var("id"))
-	if err != nil {
-		return nil, err
-	}
-	for _, event := range events {
-		f, err := s.db.Factorizer(t.Name)
-		if err != nil {
-			return nil, err
-		}
-		if err := f.DefactorizeEvent(event, t.Properties()); err != nil {
-			return nil, err
-		}
-	}
-	return t.SerializeEvents(events)
+	return t.GetEvents(req.Var("id"))
 }
 
 // deleteEvents deletes all events associated with an object.
 func (h *eventHandler) deleteEvents(s *Server, req Request) (interface{}, error) {
-	return nil, s.db.DeleteObject(req.Table().Name, req.Var("id"))
+	t := req.Table()
+	return nil, t.DeleteEvents(req.Var("id"))
 }
 
 // getEvent retrieves a single event for an object at a given point in time.
 func (h *eventHandler) getEvent(s *Server, req Request) (interface{}, error) {
-	timestamp, err := time.Parse(time.RFC3339, req.Var("timestamp"))
+	timestamp, err := db.ParseTime(req.Var("timestamp"))
 	if err != nil {
-		return nil, fmt.Errorf("server: invalid timestamp: %s", req.Var("timestamp"))
+		return nil, err
 	}
 
-	// Find event.
 	t := req.Table()
-	event, err := s.db.GetEvent(t.Name, req.Var("id"), timestamp)
-	if err != nil {
-		return nil, err
-	} else if event == nil {
-		t, err := time.Parse(time.RFC3339, req.Var("timestamp"))
-		if err != nil {
-			return nil, err
-		}
-		event = &db.Event{Timestamp: t, Data: make(map[int64]interface{})}
-	}
-
-	// Convert an event to a serializable object.
-	f, err := s.db.Factorizer(t.Name)
-	if err != nil {
-		return nil, err
-	}
-	if err := f.DefactorizeEvent(event, t.Properties()); err != nil {
-		return nil, err
-	}
-	return t.SerializeEvent(event)
+	return t.GetEvent(req.Var("id"), timestamp)
 }
 
 // insertEvent adds a single event to an object.
 func (h *eventHandler) insertEvent(s *Server, req Request) (interface{}, error) {
+	timestamp, err := db.ParseTime(req.Var("timestamp"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the event.
+	e := &db.Event{
+		Timestamp: timestamp,
+		Data: req.Data().(map[string]interface{}),
+	}
+
+	// Insert the event.
 	t := req.Table()
-	data := req.Data().(map[string]interface{})
-	data["timestamp"] = req.Var("timestamp")
-
-	event, err := t.DeserializeEvent(data)
-	if err != nil {
-		return nil, err
-	}
-
-	f, err := s.db.Factorizer(t.Name)
-	if err != nil {
-		return nil, err
-	}
-	if err = f.FactorizeEvent(event, t.Properties(), true); err != nil {
-		return nil, err
-	}
-	return nil, s.db.InsertEvent(t.Name, req.Var("id"), event)
+	return nil, t.InsertEvent(req.Var("id"), e)
 }
 
 // deleteEvent deletes a single event for an object at a given point in time.
 func (h *eventHandler) deleteEvent(s *Server, req Request) (interface{}, error) {
-	timestamp, err := time.Parse(time.RFC3339, req.Var("timestamp"))
+	timestamp, err := db.ParseTime(req.Var("timestamp"))
 	if err != nil {
-		return nil, fmt.Errorf("server: invalid timestamp: %s", req.Var("timestamp"))
+		return nil, err
 	}
 
 	t := req.Table()
-	return nil, s.db.DeleteEvent(t.Name, req.Var("id"), timestamp)
+	return nil, t.DeleteEvent(req.Var("id"), timestamp)
 }
 
 // insertEventStream is a bulk insertion end point.
 func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Request) {
+	/*
 	s := h.s
 	vars := mux.Vars(req)
 	t0 := time.Now()
@@ -227,4 +188,5 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 	fmt.Fprintf(w, `{"events_written":%v}`, events_written)
 
 	s.logger.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, events_written, time.Since(t0).Seconds())
+	*/
 }

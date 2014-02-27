@@ -267,7 +267,7 @@ func runDBMappers(shardCount int, query string, properties []*db.Property, objec
 
 		// Execute the mappers.
 		results := make([]*hashmap.Hashmap, 0)
-		table.ForEachShard(func (c *db.Cursor) {
+		table.ForEach(func (c *db.Cursor) {
 			result := hashmap.New()
 			if err = m.Map(c, "", result); err != nil {
 				panic("map error: " + err.Error())

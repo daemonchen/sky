@@ -46,11 +46,11 @@ type ensurePropertyHandler struct {
 }
 
 func (h *ensurePropertyHandler) Serve(s *Server, req Request) (interface{}, error) {
-	p, err := req.Table().GetPropertyByName(req.Var("property"))
+	p, err := req.Table().Property(req.Var("property"))
 	if err != nil {
 		return nil, err
 	} else if p == nil {
-		return nil, fmt.Errorf("server: property does not exist: %s", req.Var("property"))
+		return nil, fmt.Errorf("property not found: %s", req.Var("property"))
 	}
 	req.SetProperty(p)
 	return h.handler.Serve(s, req)

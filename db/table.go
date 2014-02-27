@@ -54,6 +54,11 @@ func (t *Table) Path() string {
 	return t.path
 }
 
+// ShardCount returns the number of shards in the table.
+func (t *Table) ShardCount() int {
+	return t.shardCount
+}
+
 // Exists returns whether the table exists.
 func (t *Table) Exists() bool {
 	_, err := os.Stat(t.path)
@@ -612,9 +617,15 @@ func (t *Table) DeleteEvents(id string) error {
 	})
 }
 
-// ForEachShard executes a function once for each shard in the table.
+// Merge combines two existing objects together.
+func (t *Table) Merge(destId, srcId string) error {
+	panic("not implemented: Table.Merge()")
+	return nil
+}
+
+// ForEach executes a function once for each shard in the table.
 // A different cursor is passed in for each function invocation.
-func (t *Table) ForEachShard(fn func(c *Cursor)) error {
+func (t *Table) ForEach(fn func(c *Cursor)) error {
 	if !t.opened() {
 		return ErrTableNotOpen
 	}
