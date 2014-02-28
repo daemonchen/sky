@@ -78,6 +78,6 @@ func TestServerMergeSameObjectNotAllowed(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		resp, _ := sendTestHttpRequest("POST", "http://localhost:8586/tables/foo/objects/a/merge", "application/json", `{"id":"a"}`)
-		assertResponse(t, resp, 500, `{"message":"server: cannot merge an object into itself"}`+"\n", "Merge error")
+		assertResponse(t, resp, 500, `{"message":"cannot merge an object into itself"}`+"\n", "Merge error")
 	})
 }

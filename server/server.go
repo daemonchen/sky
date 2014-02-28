@@ -2,11 +2,8 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
-	"os"
 	"runtime"
 	"sync"
 
@@ -23,7 +20,6 @@ type Server struct {
 	sync.Mutex
 	*http.Server
 	*mux.Router
-	logger           *log.Logger
 	db               *db.DB
 	path             string
 	listener         net.Listener
@@ -41,7 +37,6 @@ func NewServer(port uint, path string) *Server {
 	s := &Server{
 		Server:     &http.Server{Addr: fmt.Sprintf(":%d", port)},
 		Router:     mux.NewRouter(),
-		logger:     log.New(os.Stdout, "", log.LstdFlags),
 		path:       path,
 		tables:     make(map[string]*db.Table),
 		NoSync:     false,
@@ -76,88 +71,38 @@ func (s *Server) TablePath(name string) string {
 	return fmt.Sprintf("%v/%v", s.TablesPath(), name)
 }
 
-// Runs the server.
-func (s *Server) ListenAndServe(shutdownChannel chan bool) error {
-	s.shutdownChannel = shutdownChannel
-
-	err := s.open()
-	if err != nil {
-		return err
-	}
-
-	listener, err := net.Listen("tcp", s.Addr)
-	if err != nil {
-		s.close()
-		return err
-	}
-	s.listener = listener
-
-	s.shutdownFinished = make(chan bool)
-	go func() {
-		s.Serve(s.listener)
-		s.shutdownFinished <- true
-	}()
-
-	s.logger.Printf("Sky v%s is now listening on http://localhost%s\n", s.Version, s.Addr)
-
-	return nil
-}
-
-// Stops the server.
-func (s *Server) Shutdown() error {
-	// Close servlets.
-	s.close()
-
-	// Close socket.
-	if s.listener != nil {
-		// Then stop the server.
-		err := s.listener.Close()
-		s.listener = nil
-		if err != nil {
-			return err
-		}
-	}
-	// wait for server goroutine to finish
-	<-s.shutdownFinished
-
-	// Notify that the server is shutdown.
-	if s.shutdownChannel != nil {
-		s.shutdownChannel <- true
-	}
-
-	return nil
-}
-
-// Checks if the server is listening for new connections.
-func (s *Server) Running() bool {
-	return (s.listener != nil)
-}
-
-// Opens the data directory and servlets.
-func (s *Server) open() error {
-	s.close()
+// ListenAndServe starts the server and listens on the appropriate port.
+func (s *Server) ListenAndServe() error {
+	defer s.Close()
 
 	// Initialize and open database.
 	s.db = &db.DB{}
 	if err := s.db.Open(s.path); err != nil {
-		s.close()
 		return err
 	}
 
-	return nil
+	// Initialize the TCP listener and save the reference.
+	listener, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		return err
+	}
+	s.listener = listener
+
+	// Listen and block until a signal is received.
+	return s.Server.Serve(s.listener)
 }
 
-// Closes the database.
-func (s *Server) close() {
+// Close closes the port and shuts down the database.
+func (s *Server) Close() {
+	if s.listener != nil {
+		s.listener.Close()
+		s.listener = nil
+	}
+
 	if s.db != nil {
 		s.db.Close()
 		s.db = nil
 	}
-}
-
-// Silences the log.
-func (s *Server) Silence() {
-	s.logger = log.New(ioutil.Discard, "", log.LstdFlags)
 }
 
 // HandleFunc serializes and deserializes incoming requests before passing off to Gorilla.

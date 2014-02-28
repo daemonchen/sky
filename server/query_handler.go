@@ -36,7 +36,7 @@ func (h *queryHandler) query(s *Server, req Request) (interface{}, error) {
 	case []byte:
 		data = map[string]interface{}{"query": string(d)}
 	default:
-		return nil, fmt.Errorf("server: map or string input required")
+		return nil, fmt.Errorf("map or string input required")
 	}
 	querystring, _ := data["query"].(string)
 	// warn(querystring)

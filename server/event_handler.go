@@ -95,7 +95,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		var err error
 		table, err = s.OpenTable(tableName)
 		if err != nil {
-			s.logger.Printf("ERR %v", err)
+			log.Printf("ERR %v", err)
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, `{"message":"%v"}`, err)
 			return
@@ -127,7 +127,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 				var err error
 				eventTable, err = s.OpenTable(tableName)
 				if err != nil {
-					s.logger.Printf("ERR %v", err)
+					log.Printf("ERR %v", err)
 					fmt.Fprintf(w, `{"message":"%v"}`, err)
 					return fmt.Errorf("Cannot open table %s: %+v", tableName, err)
 				}
@@ -179,7 +179,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-		s.logger.Printf("ERR %v", err)
+		log.Printf("ERR %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"message":"%v", "events_written":%v}`, err, events_written)
 		return
@@ -187,6 +187,6 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 
 	fmt.Fprintf(w, `{"events_written":%v}`, events_written)
 
-	s.logger.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, events_written, time.Since(t0).Seconds())
+	log.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, events_written, time.Since(t0).Seconds())
 	*/
 }

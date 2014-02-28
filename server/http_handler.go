@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -54,7 +55,7 @@ func (h *httpHandler) parseRequest(req *http.Request) (*request, error) {
 func (h *httpHandler) parseJSONRequest(req *http.Request) (*request, error) {
 	var data map[string]interface{}
 	if err := json.NewDecoder(req.Body).Decode(&data); err != nil && err != io.EOF {
-		return nil, fmt.Errorf("server: json request error: %v", err)
+		return nil, fmt.Errorf("json request error: %v", err)
 	}
 	return &request{vars: h.readVars(req), data: data}, nil
 }
@@ -63,7 +64,7 @@ func (h *httpHandler) parseJSONRequest(req *http.Request) (*request, error) {
 func (h *httpHandler) parseTextRequest(req *http.Request) (*request, error) {
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return nil, fmt.Errorf("server: text request error: %v", err)
+		return nil, fmt.Errorf("text request error: %v", err)
 	}
 	return &request{vars: h.readVars(req), data: data}, nil
 }
@@ -78,11 +79,11 @@ func (h *httpHandler) writeResponse(w http.ResponseWriter, req *http.Request, re
 		status = http.StatusOK
 	} else {
 		status = http.StatusInternalServerError
-		h.server.logger.Printf("[error] %v", resp.Error())
+		log.Printf("[error] %v", resp.Error())
 	}
 
 	// Log request.
-	h.server.logger.Printf("%s \"%s %s %s\" %d %0.3f", req.RemoteAddr, req.Method, req.RequestURI, req.Proto, status, elapsedTime)
+	log.Printf("%s \"%s %s %s\" %d %0.3f", req.RemoteAddr, req.Method, req.RequestURI, req.Proto, status, elapsedTime)
 
 	// Write header and body.
 	w.WriteHeader(status)
@@ -97,12 +98,12 @@ func (h *httpHandler) writeJSONResponse(w http.ResponseWriter, resp Response) {
 		ret := map[string]interface{}{"message": resp.Error().Error()}
 		// json.NewEncoder(os.Stderr).Encode(ret)
 		if err := json.NewEncoder(w).Encode(ret); err != nil {
-			h.server.logger.Printf("server: encoding error[err]: %v", err)
+			log.Printf("encoding error[err]: %v", err)
 		}
 	} else if resp.Data() != nil {
 		// json.NewEncoder(os.Stderr).Encode(resp.Data())
 		if err := json.NewEncoder(w).Encode(resp.Data()); err != nil {
-			h.server.logger.Printf("server: encoding error: %v", err)
+			log.Printf("encoding error: %v", err)
 		}
 	}
 }
