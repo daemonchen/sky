@@ -1,3 +1,4 @@
+COMMIT=`git rev-parse --short HEAD`
 CFLAGS=`llvm-config --cflags`
 LDFLAGS="`llvm-config --ldflags` -Wl,-L`llvm-config --libdir` -lLLVM-`llvm-config --version`"
 COVERPROFILE=/tmp/c.out
@@ -10,7 +11,7 @@ default: build
 bench: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.bench=. $(PKG)
 
-build: grammar
+build: grammar version
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -a -o bin/skyd ./cmd/skyd/main.go ./cmd/skyd/config.go
 
 cover: fmt
@@ -32,10 +33,14 @@ get:
 grammar:
 	${MAKE} -C query/parser
 
-run: grammar
+run: grammar version
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run ./cmd/skyd/main.go ./cmd/skyd/config.go
 
 test: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) $(PKG)
 
-.PHONY: default bench build cover env fmt get grammar run test
+version:
+	@gofmt -r 'a + branchMarker -> "'`git rev-parse --abbrev-ref HEAD`'" + branchMarker' -w version/version.go
+	@gofmt -r 'a + commitMarker -> "'`git rev-parse --short HEAD`'" + commitMarker' -w version/version.go
+
+.PHONY: default bench build cover env fmt get grammar run test version

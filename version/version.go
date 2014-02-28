@@ -3,6 +3,11 @@ package version
 import "fmt"
 
 const (
+	branchMarker = ""
+	commitMarker = ""
+)
+
+const (
 	// Major is the major version.
 	Major = 0
 
@@ -13,10 +18,10 @@ const (
 	Patch = 0
 
 	// Branch is the branch that Sky was built from.
-	Branch = ""
+	Branch = "" + branchMarker
 
 	// Commit is the short SHA1 git commit Sky was built from.
-	Commit = ""
+	Commit = "" + commitMarker
 )
 
 // String returns the full version string.
