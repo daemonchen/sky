@@ -457,6 +457,10 @@ func (t *Table) GetEvents(id string) ([]*Event, error) {
 }
 
 func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
+	if id == "" {
+		return nil, ErrObjectIDRequired
+	}
+
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, timestamp)
 	prefix := buf.Bytes()
@@ -484,6 +488,10 @@ func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
 }
 
 func (t *Table) getRawEvents(id string) ([]*rawEvent, error) {
+	if id == "" {
+		return nil, ErrObjectIDRequired
+	}
+
 	// Retrieve all bytes from the database.
 	var slices [][]byte
 	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
@@ -552,7 +560,10 @@ func (t *Table) InsertObjects(objects map[string][]*Event) error {
 }
 
 func (t *Table) insertEvent(id string, e *Event) error {
-	// Convert to raw event.
+ 	if id == "" {
+		return ErrObjectIDRequired
+	}
+		// Convert to raw event.
 	rawEvent, err := t.toRawEvent(e)
 	if err != nil {
 		return err

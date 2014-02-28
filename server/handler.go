@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"log"
 )
 
 // Handler provides an interface for individual handler methods. These can be
@@ -67,7 +66,6 @@ type ensureMapHandler struct {
 }
 
 func (h *ensureMapHandler) Serve(s *Server, req Request) (interface{}, error) {
-	log.Printf("%v", req.Data())
 	if _, ok := req.Data().(map[string]interface{}); !ok {
 		return nil, fmt.Errorf("map input required")
 	}

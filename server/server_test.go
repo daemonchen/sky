@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -19,6 +20,9 @@ func init() {
 	// Standardize servlet count for tests so we don't get different
 	// results on different machines.
 	defaultServletCount = 16
+
+	// Turn off logging.
+	log.SetOutput(ioutil.Discard)
 }
 
 func sendText(method string, path string, body string) (int, string) {
@@ -87,12 +91,11 @@ func sendTestHttpRequest(method string, url string, contentType string, body str
 }
 
 func runTestServerAt(path string, f func(s *Server)) {
-	server := NewServer(testPort, path)
-	server.Version = "0.0.0"
-	server.Silence()
-	server.ListenAndServe(nil)
-	defer server.Shutdown()
-	f(server)
+	s := NewServer(testPort, path)
+	s.Version = "0.0.0"
+	go s.ListenAndServe()
+	defer s.Close()
+	f(s)
 }
 
 func runTestServer(f func(s *Server)) {

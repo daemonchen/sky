@@ -52,7 +52,6 @@ func (h *queryHandler) count(s *Server, req Request) (interface{}, error) {
 func (h *queryHandler) execute(s *Server, req Request, querystring string) (interface{}, error) {
 	var wg sync.WaitGroup
 	t := req.Table()
-	t0 := bench("query")
 
 	var data, ok = req.Data().(map[string]interface{})
 	if !ok {
@@ -82,14 +81,10 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 		return nil, err
 	}
 
-	t0 = bench("query.parse", t0)
-
 	// Validate query.
 	if err := validator.Validate(q); err != nil {
 		return nil, err
 	}
-
-	t0 = bench("query.validate", t0)
 
 	// TODO(benbjohnson): Add Mapper.Clone() and run each shard separately.
 
@@ -101,10 +96,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	defer m.Close()
 	// m.Dump()
 
-	t0 = bench("query.codegen", t0)
-
 	// Execute one mapper for each cursor.
-	t1 := bench("map")
 	results := make(chan interface{}, t.ShardCount())
 	t.ForEach(func(cursor *db.Cursor) {
 		wg.Add(1)
@@ -116,7 +108,6 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 		} else {
 			results <- err
 		}
-		bench("map", t1)
 		wg.Done()
 		//}(cursor)
 	})

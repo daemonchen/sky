@@ -111,7 +111,7 @@ func TestServerStreamUpdateEvents(t *testing.T) {
 		// Send two new events in one request.
 		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
 		assert.Equal(t, code, 200)
-		assert.Equal(t, jsonenc(resp), `{"events_written":2}`)
+		assert.Equal(t, jsonenc(resp), `{"count":2}`)
 
 		// Check our work.
 		code, resp = getJSON("/tables/foo/objects/xyz/events")
@@ -134,7 +134,7 @@ func TestServerStreamUpdateEventsTableAgnostic(t *testing.T) {
 		// Send two new events in one request.
 		code, resp := patchJSON("/events", `{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
 		assert.Equal(t, code, 200)
-		assert.Equal(t, jsonenc(resp), `{"events_written":4}`)
+		assert.Equal(t, jsonenc(resp), `{"count":4}`)
 
 		// Check our work.
 		code, resp = getJSON("/tables/foo_1/objects/xyz/events")

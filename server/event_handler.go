@@ -1,8 +1,14 @@
 package server
 
 import (
+	"fmt"
+	"encoding/json"
+	"io"
+	"log"
 	"net/http"
+	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/skydb/sky/db"
 )
 
@@ -24,8 +30,8 @@ func installEventHandler(s *Server) *eventHandler {
 	s.HandleFunc("/tables/{table}/objects/{id}/events/{timestamp}", EnsureMapHandler(EnsureTableHandler(HandleFunc(h.insertEvent)))).Methods("PUT", "PATCH")
 	s.HandleFunc("/tables/{table}/objects/{id}/events/{timestamp}", EnsureTableHandler(HandleFunc(h.deleteEvent))).Methods("DELETE")
 
-	s.Router.HandleFunc("/events", h.insertEventStream).Methods("PATCH")
-	s.Router.HandleFunc("/tables/{table}/events", h.insertEventStream).Methods("PATCH")
+	s.Router.HandleFunc("/events", h.insertGenericEventStream).Methods("PATCH")
+	s.Router.HandleFunc("/tables/{table}/events", h.insertTableEventStream).Methods("PATCH")
 
 	return h
 }
@@ -82,111 +88,92 @@ func (h *eventHandler) deleteEvent(s *Server, req Request) (interface{}, error) 
 	return nil, t.DeleteEvent(req.Var("id"), timestamp)
 }
 
-// insertEventStream is a bulk insertion end point.
-func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Request) {
-	/*
+// insertEventStream is a bulk insertion end point for a single table.
+func (h *eventHandler) insertTableEventStream(w http.ResponseWriter, req *http.Request) {
 	s := h.s
 	vars := mux.Vars(req)
-	t0 := time.Now()
 
-	var table *db.Table
-	tableName := vars["table"]
-	if tableName != "" {
+	// Open the requested table.
+	var t *db.Table
+	if vars["table"] != "" {
 		var err error
-		table, err = s.OpenTable(tableName)
+		t, err = s.db.OpenTable(vars["table"])
 		if err != nil {
-			log.Printf("ERR %v", err)
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(w, `{"message":"%v"}`, err)
+			h.Error(w, "stream error: " + err.Error(), http.StatusNotFound)
 			return
 		}
 	}
 
-	tableObjects := make(map[*db.Table]objectEvents)
+	h.insertEventStream(w, req, t)
+}
 
-	events_written := 0
-	err := func() error {
-		// Stream in JSON event objects.
-		decoder := json.NewDecoder(req.Body)
-		for {
-			// Read in a JSON object.
-			rawEvent := map[string]interface{}{}
-			if err := decoder.Decode(&rawEvent); err == io.EOF {
-				break
-			} else if err != nil {
-				return fmt.Errorf("Malformed json event: %v", err)
-			}
+// insertGenericEventStream is a bulk insertion end point for multiple tables.
+func (h *eventHandler) insertGenericEventStream(w http.ResponseWriter, req *http.Request) {
+	h.insertEventStream(w, req, nil)
+}
 
-			// Extract table name, if necessary.
-			var eventTable *db.Table
-			if table == nil {
-				tableName, ok := rawEvent["table"].(string)
-				if !ok {
-					return fmt.Errorf("Table name required within event when using generic event stream.")
-				}
-				var err error
-				eventTable, err = s.OpenTable(tableName)
-				if err != nil {
-					log.Printf("ERR %v", err)
-					fmt.Fprintf(w, `{"message":"%v"}`, err)
-					return fmt.Errorf("Cannot open table %s: %+v", tableName, err)
-				}
-				delete(rawEvent, "table")
-			} else {
-				eventTable = table
-			}
+// insertEventStream is a bulk insertion end point.
+func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Request, defaultTable *db.Table) {
+	var count = 0
+	var startTime = time.Now()
 
-			// Extract the object identifier.
-			objectId, ok := rawEvent["id"].(string)
-			if !ok {
-				return fmt.Errorf("Object identifier required")
-			}
-
-			// Convert to a Sky event and insert.
-			event, err := eventTable.DeserializeEvent(rawEvent)
-			if err != nil {
-				return fmt.Errorf("Cannot deserialize: %v", err)
-			}
-
-			f, err := s.db.Factorizer(eventTable.Name)
-			if err != nil {
-				return err
-			}
-			if err := f.FactorizeEvent(event, eventTable.Properties(), true); err != nil {
-				return fmt.Errorf("Cannot factorize: %v", err)
-			}
-
-			if _, ok := tableObjects[eventTable]; !ok {
-				tableObjects[eventTable] = make(objectEvents)
-			}
-			tableObjects[eventTable][objectId] = append(tableObjects[eventTable][objectId], event)
+	// Stream in JSON event objects.
+	var decoder = json.NewDecoder(req.Body)
+	for {
+		// Read in a JSON object.
+		var message = new(eventMessage)
+		if err := decoder.Decode(&message); err == io.EOF {
+			break
+		} else if err != nil {
+			fmt.Errorf("malformed json event[idx=%d]: %v", count, err)
+			return
 		}
 
-		return nil
-	}()
+		// Create the event.
+		var event = &db.Event{Timestamp: message.Timestamp, Data: message.Data}
 
-	if err == nil {
-		err = func() error {
-			for table, objects := range tableObjects {
-				count, err := s.db.InsertObjects(table.Name, objects)
-				if err != nil {
-					return fmt.Errorf("Cannot put event: %v", err)
-				}
-				events_written += count
+		// Find target table.
+		var t = defaultTable
+		if t == nil {
+			var err error
+			if t, err = h.s.db.OpenTable(message.Table); err != nil {
+				h.Error(w, fmt.Sprintf("stream error[idx=%d]: %v", count, err), http.StatusBadRequest)
+				return
 			}
-			return nil
-		}()
+		}
+
+		// Extract the object identifier.
+		if message.ID == "" {
+			h.Error(w, fmt.Sprintf("stream error[idx=%d]: object id required", count), http.StatusBadRequest)
+			return
+		}
+
+		// Insert event.
+		if err := t.InsertEvent(message.ID, event); err != nil {
+			h.Error(w, fmt.Sprintf("stream error[idx=%d]: %v", count, err), http.StatusBadRequest)
+			return
+		}
+
+		count++
 	}
 
-	if err != nil {
-		log.Printf("ERR %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"message":"%v", "events_written":%v}`, err, events_written)
-		return
-	}
+	// Write out total count.
+	json.NewEncoder(w).Encode(map[string]interface{}{"count":count})
 
-	fmt.Fprintf(w, `{"events_written":%v}`, events_written)
+	// Log the total time.
+	log.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, count, time.Since(startTime).Seconds())
+}
 
-	log.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, events_written, time.Since(t0).Seconds())
-	*/
+// Error writes an error to the writer.
+func (h *eventHandler) Error(w http.ResponseWriter, error string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]interface{}{"message": error})
+}
+
+type eventMessage struct {
+	ID string `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	Table     string    `json:"table"`
+	Data      map[string]interface{} `json:"data"`
 }
