@@ -25,6 +25,12 @@ func init() {
 	log.SetOutput(ioutil.Discard)
 }
 
+// Ensure that server paths are correct.
+func TestServerPath(t *testing.T) {
+	s := &Server{path: "/tmp/sky"}
+	assert.Equal(t, s.Path(), "/tmp/sky")
+}
+
 func sendText(method string, path string, body string) (int, string) {
 	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
 	req, _ := http.NewRequest(method, fmt.Sprintf("http://localhost:%d%s", testPort, path), bytes.NewBufferString(body))

@@ -1,8 +1,8 @@
 package server
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -99,7 +99,7 @@ func (h *eventHandler) insertTableEventStream(w http.ResponseWriter, req *http.R
 		var err error
 		t, err = s.db.OpenTable(vars["table"])
 		if err != nil {
-			h.Error(w, "stream error: " + err.Error(), http.StatusNotFound)
+			h.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 	}
@@ -125,7 +125,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		if err := decoder.Decode(&message); err == io.EOF {
 			break
 		} else if err != nil {
-			fmt.Errorf("malformed json event[idx=%d]: %v", count, err)
+			h.Error(w, fmt.Sprintf("%v: %d", err, count), http.StatusBadRequest)
 			return
 		}
 
@@ -137,20 +137,14 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		if t == nil {
 			var err error
 			if t, err = h.s.db.OpenTable(message.Table); err != nil {
-				h.Error(w, fmt.Sprintf("stream error[idx=%d]: %v", count, err), http.StatusBadRequest)
+				h.Error(w, fmt.Sprintf("%v: %s: %d", err, message.Table, count), http.StatusBadRequest)
 				return
 			}
 		}
 
-		// Extract the object identifier.
-		if message.ID == "" {
-			h.Error(w, fmt.Sprintf("stream error[idx=%d]: object id required", count), http.StatusBadRequest)
-			return
-		}
-
 		// Insert event.
 		if err := t.InsertEvent(message.ID, event); err != nil {
-			h.Error(w, fmt.Sprintf("stream error[idx=%d]: %v", count, err), http.StatusBadRequest)
+			h.Error(w, fmt.Sprintf("%v: %s: %d", err, message.ID, count), http.StatusBadRequest)
 			return
 		}
 
@@ -158,7 +152,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 	}
 
 	// Write out total count.
-	json.NewEncoder(w).Encode(map[string]interface{}{"count":count})
+	json.NewEncoder(w).Encode(map[string]interface{}{"count": count})
 
 	// Log the total time.
 	log.Printf("%s \"%s %s %s %d events OK\" %0.3f", req.RemoteAddr, req.Method, req.URL.Path, req.Proto, count, time.Since(startTime).Seconds())
@@ -172,8 +166,8 @@ func (h *eventHandler) Error(w http.ResponseWriter, error string, code int) {
 }
 
 type eventMessage struct {
-	ID string `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
-	Table     string    `json:"table"`
+	ID        string                 `json:"id"`
+	Timestamp time.Time              `json:"timestamp"`
+	Table     string                 `json:"table"`
 	Data      map[string]interface{} `json:"data"`
 }

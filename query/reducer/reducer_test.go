@@ -23,7 +23,7 @@ func TestReducerSelectCount(t *testing.T) {
 		END
 	`
 	result, err := runDBMapReducer(1, query, []*db.Property{
-		{Name:"foo", DataType:db.Integer, Transient: false},
+		{Name: "foo", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "foo", 10),
@@ -44,9 +44,9 @@ func TestReducerSelectGroupBy(t *testing.T) {
 		END
 	`
 	result, err := runDBMapReducer(1, query, []*db.Property{
-		{Name:"action", DataType:db.Factor, Transient: false},
-		{Name:"booleanValue", DataType:db.Boolean, Transient: false},
-		{Name:"integerValue", DataType:db.Integer, Transient: false},
+		{Name: "action", DataType: db.Factor, Transient: false},
+		{Name: "booleanValue", DataType: db.Boolean, Transient: false},
+		{Name: "integerValue", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "action", "A0", "booleanValue", true, "integerValue", 10),
@@ -68,7 +68,7 @@ func TestReducerSelectInto(t *testing.T) {
 		END
 	`
 	result, err := runDBMapReducer(1, query, []*db.Property{
-		{Name:"foo", DataType:db.Integer, Transient: false},
+		{Name: "foo", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "foo", 10),
@@ -160,7 +160,7 @@ func runDBMappers(shardCount int, query string, properties []*db.Property, objec
 
 		// Execute the mappers.
 		results := make([]*hashmap.Hashmap, 0)
-		table.ForEach(func (c *db.Cursor) {
+		table.ForEach(func(c *db.Cursor) {
 			result := hashmap.New()
 			if err = m.Map(c, "", result); err != nil {
 				panic("map error: " + err.Error())

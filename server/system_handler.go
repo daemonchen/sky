@@ -20,4 +20,3 @@ func (h *systemHandler) root(s *Server, req Request) (interface{}, error) {
 func (h *systemHandler) ping(s *Server, req Request) (interface{}, error) {
 	return map[string]interface{}{"message": "ok"}, nil
 }
-

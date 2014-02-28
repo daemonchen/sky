@@ -40,6 +40,16 @@ func TestServerPropertyGet(t *testing.T) {
 	})
 }
 
+// Ensure that retrieving a missing property returns an error.
+func TestServerPropertyGetNotFound(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		code, resp := getJSON("/tables/foo/properties/bar")
+		assert.Equal(t, code, 500)
+		assert.Equal(t, jsonenc(resp), `{"message":"property not found: bar"}`)
+	})
+}
+
 // Ensure that we can update a property name through the server.
 func TestServerPropertyUpdate(t *testing.T) {
 	runTestServer(func(s *Server) {

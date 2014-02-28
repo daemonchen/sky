@@ -42,6 +42,36 @@ func TestServerEventUpdate(t *testing.T) {
 	})
 }
 
+// Ensure that retrieving an event with a bad timestamp returns an error.
+func TestServerEventGetWithInvalidTimestamp(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		code, resp := getJSON("/tables/foo/objects/xyz/events/bad_timestamp")
+		assert.Equal(t, code, 500)
+		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp"}`)
+	})
+}
+
+// Ensure that inserting an event with a bad timestamp returns an error.
+func TestServerEventInsertWithInvalidTimestamp(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		code, resp := putJSON("/tables/foo/objects/xyz/events/bad_timestamp", `{"data":{"bar":"myValue", "baz":12}}`)
+		assert.Equal(t, code, 500)
+		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp"}`)
+	})
+}
+
+// Ensure that deleting an event with a bad timestamp returns an error.
+func TestServerEventDeleteWithInvalidTimestamp(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		code, resp := deleteJSON("/tables/foo/objects/xyz/events/bad_timestamp", ``)
+		assert.Equal(t, code, 500)
+		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp"}`)
+	})
+}
+
 // Ensure that we receive an error when inserting a large record.
 func TestServerInsertEventTooLarge(t *testing.T) {
 	runTestServer(func(s *Server) {
@@ -102,7 +132,7 @@ func TestServerDeleteEvents(t *testing.T) {
 }
 
 // Ensure that we can put multiple events on the server at once.
-func TestServerStreamUpdateEvents(t *testing.T) {
+func TestServerTableStream(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo")
 		setupTestProperty("foo", "bar", false, "string")
@@ -121,7 +151,7 @@ func TestServerStreamUpdateEvents(t *testing.T) {
 }
 
 // Ensure that we can put multiple events on the server at once, using table agnostic event stream.
-func TestServerStreamUpdateEventsTableAgnostic(t *testing.T) {
+func TestServerGenericStream(t *testing.T) {
 	runTestServer(func(s *Server) {
 		setupTestTable("foo_1")
 		setupTestProperty("foo_1", "bar", false, "string")
@@ -144,5 +174,45 @@ func TestServerStreamUpdateEventsTableAgnostic(t *testing.T) {
 		code, resp = getJSON("/tables/foo_2/objects/xyz/events")
 		assert.Equal(t, code, 200)
 		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
+	})
+}
+
+// Ensure that streaming events to a table that doesn't exist returns an error.
+func TestServerTableStreamNotFound(t *testing.T) {
+	runTestServer(func(s *Server) {
+		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 404)
+		assert.Equal(t, jsonenc(resp), `{"message":"table not found"}`)
+	})
+}
+
+// Ensure that a malformed request body to a stream returns an error.
+func TestServerTableStreamBadJSON(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-`)
+		assert.Equal(t, code, 400)
+		assert.Equal(t, jsonenc(resp), `{"message":"unexpected EOF: 0"}`)
+	})
+}
+
+// Ensure that streaming events without ids returns an error.
+func TestServerTableStreamObjectIDRequired(t *testing.T) {
+	runTestServer(func(s *Server) {
+		setupTestTable("foo")
+		setupTestProperty("foo", "bar", false, "string")
+		setupTestProperty("foo", "baz", true, "integer")
+		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 400)
+		assert.Equal(t, jsonenc(resp), `{"message":"object id required: : 1"}`)
+	})
+}
+
+// Ensure that a generic event stream with a missing table returns an error.
+func TestServerGenericStreamTableNotFound(t *testing.T) {
+	runTestServer(func(s *Server) {
+		code, resp := patchJSON("/events", `{"id":"xyz","table":"no_such_table","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
+		assert.Equal(t, code, 400)
+		assert.Equal(t, jsonenc(resp), `{"message":"table not found: no_such_table: 0"}`)
 	})
 }

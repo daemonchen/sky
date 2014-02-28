@@ -3,9 +3,9 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"time"

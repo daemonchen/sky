@@ -2,7 +2,7 @@ package server
 
 import (
 	"sort"
-	
+
 	"github.com/skydb/sky/db"
 )
 

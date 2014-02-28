@@ -297,7 +297,7 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 
 	// Create and validate property.
 	p := &Property{
-		table: t,
+		table:     t,
 		Name:      name,
 		Transient: transient,
 		DataType:  dataType,
@@ -560,10 +560,10 @@ func (t *Table) InsertObjects(objects map[string][]*Event) error {
 }
 
 func (t *Table) insertEvent(id string, e *Event) error {
- 	if id == "" {
+	if id == "" {
 		return ErrObjectIDRequired
 	}
-		// Convert to raw event.
+	// Convert to raw event.
 	rawEvent, err := t.toRawEvent(e)
 	if err != nil {
 		return err
@@ -994,7 +994,7 @@ type tableRawMessage struct {
 
 // Event represents the state for an object at a given point in time.
 type Event struct {
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp time.Time              `json:"timestamp"`
 	Data      map[string]interface{} `json:"data"`
 }
 

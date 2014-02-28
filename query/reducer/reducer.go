@@ -9,17 +9,17 @@ import (
 // Reducer takes the results of multiple mapper executions and combines
 // them into a single final output.
 type Reducer struct {
-	table *db.Table
-	query      *ast.Query
-	output     map[string]interface{}
+	table  *db.Table
+	query  *ast.Query
+	output map[string]interface{}
 }
 
 // New creates a new Reducer instance.
 func New(q *ast.Query, t *db.Table) *Reducer {
 	return &Reducer{
-		table: t,
-		query:      q,
-		output:     make(map[string]interface{}),
+		table:  t,
+		query:  q,
+		output: make(map[string]interface{}),
 	}
 }
 

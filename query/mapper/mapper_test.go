@@ -30,7 +30,7 @@ func TestMapperSelectCount(t *testing.T) {
 		END
 	`
 	result, err := runDBMapper(query, []*db.Property{
-		{Name:"foo", DataType:db.Integer, Transient: false},
+		{Name: "foo", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "foo", 10),
@@ -53,7 +53,7 @@ func TestMapperSelectInto(t *testing.T) {
 		END
 	`
 	result, err := runDBMapper(query, []*db.Property{
-		{Name:"foo", DataType:db.Integer, Transient: false},
+		{Name: "foo", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "foo", 10),
@@ -78,7 +78,7 @@ func TestMapperCondition(t *testing.T) {
 		END
 	`
 	result, err := runDBMapper(query, []*db.Property{
-		{Name:"foo", DataType:db.Integer, Transient: false},
+		{Name: "foo", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "foo", 10),
@@ -103,7 +103,7 @@ func TestMapperFactorEquality(t *testing.T) {
 		END
 	`
 	result, err := runDBMapper(query, []*db.Property{
-		{Name:"factorVariable", DataType:db.Factor, Transient: false},
+		{Name: "factorVariable", DataType: db.Factor, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "factorVariable", "XXX"), // "XXX"
@@ -128,7 +128,7 @@ func TestMapperAssignment(t *testing.T) {
 		END
 	`
 	result, err := runDBMapper(query, []*db.Property{
-		{Name:"integerVariable", DataType:db.Integer, Transient: false},
+		{Name: "integerVariable", DataType: db.Integer, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("2000-01-01T00:00:00Z", "integerVariable", 1),
@@ -154,7 +154,7 @@ func TestMapperSessionLoop(t *testing.T) {
 		END
 	`
 	result, err := runDBMapper(query, []*db.Property{
-		{Name:"action", DataType:db.Factor, Transient: false},
+		{Name: "action", DataType: db.Factor, Transient: false},
 	}, map[string][]*db.Event{
 		"foo": []*db.Event{
 			testevent("1970-01-01T00:00:01Z", "action", "A0"), // ts=1
@@ -267,7 +267,7 @@ func runDBMappers(shardCount int, query string, properties []*db.Property, objec
 
 		// Execute the mappers.
 		results := make([]*hashmap.Hashmap, 0)
-		table.ForEach(func (c *db.Cursor) {
+		table.ForEach(func(c *db.Cursor) {
 			result := hashmap.New()
 			if err = m.Map(c, "", result); err != nil {
 				panic("map error: " + err.Error())

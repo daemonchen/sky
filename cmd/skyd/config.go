@@ -8,13 +8,13 @@ import (
 
 const (
 	// DefaultPort is the port that Sky listens on by default.
-	DefaultPort       = 8585
+	DefaultPort = 8585
 
 	// DefaultNoSync is the default setting for syncing the data.
-	DefaultNoSync     = false
+	DefaultNoSync = false
 
 	// DefaultMaxDBs is the default LMDB setting for MaxDBs.
-	DefaultMaxDBs     = 4096
+	DefaultMaxDBs = 4096
 
 	// DefaultMaxReaders is the default LMDB setting for MaxReaders.
 	DefaultMaxReaders = 126 // lmdb's default

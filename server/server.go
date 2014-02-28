@@ -20,16 +20,13 @@ type Server struct {
 	sync.Mutex
 	*http.Server
 	*mux.Router
-	db               *db.DB
-	path             string
-	listener         net.Listener
-	tables           map[string]*db.Table
-	shutdownChannel  chan bool
-	shutdownFinished chan bool
-	NoSync           bool
-	MaxDBs           uint
-	MaxReaders       uint
-	Version          string
+	db         *db.DB
+	path       string
+	listener   net.Listener
+	NoSync     bool
+	MaxDBs     uint
+	MaxReaders uint
+	Version    string
 }
 
 // NewServer creates a new Server instance.
@@ -38,7 +35,6 @@ func NewServer(port uint, path string) *Server {
 		Server:     &http.Server{Addr: fmt.Sprintf(":%d", port)},
 		Router:     mux.NewRouter(),
 		path:       path,
-		tables:     make(map[string]*db.Table),
 		NoSync:     false,
 		MaxDBs:     4096,
 		MaxReaders: 126,
@@ -59,16 +55,6 @@ func NewServer(port uint, path string) *Server {
 // The root server path.
 func (s *Server) Path() string {
 	return s.path
-}
-
-// The path to the table metadata directory.
-func (s *Server) TablesPath() string {
-	return fmt.Sprintf("%v/tables", s.path)
-}
-
-// Generates the path for a table attached to the server.
-func (s *Server) TablePath(name string) string {
-	return fmt.Sprintf("%v/%v", s.TablesPath(), name)
 }
 
 // ListenAndServe starts the server and listens on the appropriate port.

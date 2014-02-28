@@ -15,7 +15,6 @@ func TestServerPing(t *testing.T) {
 	})
 }
 
-
 func TestServerIndex(t *testing.T) {
 	runTestServer(func(S *Server) {
 		resp, err := sendTestHttpRequest("GET", "http://localhost:8586/", "application/json", "")

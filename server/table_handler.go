@@ -70,7 +70,6 @@ func (h *tableHandler) stats(s *Server, req Request) (interface{}, error) {
 	return req.Table().Stat()
 }
 
-
 type tableMessage struct {
 	Name string `json:"name"`
 }

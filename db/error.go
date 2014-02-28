@@ -20,7 +20,7 @@ var (
 	ErrTableExists = &Error{"table already exists", nil}
 
 	// ErrTableNotFound is returned when accessing a table that doesn't exist.
-	ErrTableNotFound = &Error{"table does not exist", nil}
+	ErrTableNotFound = &Error{"table not found", nil}
 
 	// ErrTableNameRequired is returned when open a table without a name.
 	ErrTableNameRequired = &Error{"table name required", nil}
