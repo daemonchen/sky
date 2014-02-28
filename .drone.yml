@@ -1,6 +1,6 @@
 image: skydb/dependencies-unstable
 env:
-  - GOPATH=/usr/local/go
+  - GOPATH=/var/cache/drone
 script:
   - go get github.com/stretchr/testify
   - make test
