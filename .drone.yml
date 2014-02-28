@@ -1,0 +1,10 @@
+image: skydb/dependencies-unstable
+env:
+  - GOPATH=/usr/local/go
+script:
+  - go get github.com/stretchr/testify
+  - make test
+notify:
+  email:
+    recipients:
+      - ben@skylandlabs.com
