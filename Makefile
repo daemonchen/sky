@@ -11,7 +11,7 @@ bench: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.bench=. $(PKG)
 
 build: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -a -o skyd .
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -a -o bin/skyd ./cmd/skyd/main.go ./cmd/skyd/config.go
 
 cover: fmt
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) -coverprofile=$(COVERPROFILE) $(PKG)
@@ -25,7 +25,9 @@ fmt:
 	go fmt ./...
 
 get:
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) get .
+	curl https://raw.github.com/axw/gollvm/master/install.sh | sh
+	$(GO) get github.com/stretchr/testify
+	$(GO) get ./...
 
 grammar:
 	${MAKE} -C query/parser
