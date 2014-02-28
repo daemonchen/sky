@@ -1,4 +1,4 @@
-package config
+package main
 
 import (
 	"github.com/BurntSushi/toml"
@@ -8,17 +8,15 @@ import (
 const (
 	DefaultPort       = 8585
 	DefaultDataPath   = "/var/lib/sky"
-	DefaultPidPath    = "/var/run/skyd.pid"
 	DefaultNoSync     = false
 	DefaultMaxDBs     = 4096
 	DefaultMaxReaders = 126 // lmdb's default
 )
 
-// The configuration for running Sky.
+// Config represents the configuration settings used to start skyd.
 type Config struct {
 	Port       uint   `toml:"port"`
 	DataPath   string `toml:"data-path"`
-	PidPath    string `toml:"pid-path"`
 	NoSync     bool   `toml:"nosync"`
 	MaxDBs     uint   `toml:"max-dbs"`
 	MaxReaders uint   `toml:"max-readers"`
@@ -29,7 +27,6 @@ func NewConfig() *Config {
 	return &Config{
 		Port:       DefaultPort,
 		DataPath:   DefaultDataPath,
-		PidPath:    DefaultPidPath,
 		NoSync:     DefaultNoSync,
 		MaxDBs:     DefaultMaxDBs,
 		MaxReaders: DefaultMaxReaders,

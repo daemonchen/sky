@@ -1,9 +1,10 @@
-package config
+package main_test
 
 import (
 	"bytes"
 	"testing"
 
+	. "github.com/skydb/sky/cmd/skyd"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,7 +13,6 @@ func TestDecode(t *testing.T) {
 	input := `
 port=9000
 data-path="/home/data"
-pid-path = "/home/pid"
 nosync = true
 max-dbs = 5
 max-readers = 250
@@ -23,7 +23,6 @@ max-readers = 250
 	assert.NoError(t, err)
 	assert.Equal(t, config.Port, uint(9000))
 	assert.Equal(t, config.DataPath, "/home/data")
-	assert.Equal(t, config.PidPath, "/home/pid")
 	assert.Equal(t, config.NoSync, true)
 	assert.Equal(t, config.MaxDBs, uint(5))
 	assert.Equal(t, config.MaxReaders, uint(250))

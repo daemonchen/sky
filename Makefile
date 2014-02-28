@@ -31,7 +31,7 @@ grammar:
 	${MAKE} -C query/parser
 
 run: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run main.go
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run ./cmd/main.go ./cmd/config.go
 
 test: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) $(PKG)
