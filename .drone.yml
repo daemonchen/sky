@@ -3,6 +3,7 @@ env:
   - GOPATH=/var/cache/drone
 script:
   - go get github.com/stretchr/testify
+  - go get ./...
   - make test
 notify:
   email:
