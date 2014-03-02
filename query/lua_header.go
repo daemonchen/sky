@@ -185,20 +185,22 @@ end
 
 -- Inserts a value into an existing distinct.
 function sky_distinct_insert(distinct, value)
+  if distinct.values == nil then distinct.values = {} end
   distinct.values[value] = 1
 end
 
 -- Merges one distinct into another.
 function sky_distinct_merge(a, b)
   -- takes two distincts
+
   if a == nil then
-    a = b
+    a = b or {}
   elseif b ~= nil then
-    for k,v in pairs(b.values) do sky_distinct_insert(a, k) end
+    for k,v in pairs(b.values or {}) do sky_distinct_insert(a or {}, k) end
   end
 
   local count = 0
-  for k,v in pairs(a.values) do count = count + 1 end
+  for k,v in pairs(a.values or {}) do count = count + 1 end
   a.distinct = count
 
   return a
