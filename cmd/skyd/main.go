@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	. "github.com/skydb/sky/config"
 	"github.com/skydb/sky/server"
 	"io/ioutil"
 	"os"
