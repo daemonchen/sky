@@ -259,7 +259,13 @@ void sky_hashmap_benchmark_set(sky_hashmap *hashmap, int64_t n)
 }
 */
 import "C"
-import "unsafe"
+
+import (
+	"hash/fnv"
+	"unsafe"
+
+	"github.com/axw/gollvm/llvm"
+)
 
 const (
 	NullValueType    = C.null_value_type
@@ -355,4 +361,30 @@ func benchmarkGet(h *Hashmap, n int64) {
 // benchmark runs set() N number of times within the C context.
 func benchmarkSet(h *Hashmap, n int64) {
 	C.sky_hashmap_benchmark_set(h.C, C.int64_t(n))
+}
+
+func DeclareType(m llvm.Module, c llvm.Context) llvm.Type {
+	return c.StructCreateNamed("sky_hashmap")
+}
+
+func Declare(m llvm.Module, c llvm.Context, hashmapType llvm.Type) {
+	llvm.AddFunction(m, "sky_hashmap_new", llvm.FunctionType(llvm.PointerType(hashmapType, 0), []llvm.Type{}, false))
+	llvm.AddFunction(m, "sky_hashmap_free", llvm.FunctionType(c.VoidType(), []llvm.Type{llvm.PointerType(hashmapType, 0)}, false))
+	llvm.AddFunction(m, "sky_hashmap_get", llvm.FunctionType(c.Int64Type(), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type()}, false))
+	llvm.AddFunction(m, "sky_hashmap_set", llvm.FunctionType(c.VoidType(), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type(), c.Int64Type()}, false))
+	llvm.AddFunction(m, "sky_hashmap_get_double", llvm.FunctionType(c.DoubleType(), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type()}, false))
+	llvm.AddFunction(m, "sky_hashmap_set_double", llvm.FunctionType(c.VoidType(), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type(), c.DoubleType()}, false))
+	llvm.AddFunction(m, "sky_hashmap_submap", llvm.FunctionType(llvm.PointerType(hashmapType, 0), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type()}, false))
+}
+
+// String generates a hash id for strings.
+func String(s string) int64 {
+	h := fnv.New64a()
+	h.Reset()
+	h.Write([]byte(s))
+	value := int64(h.Sum64())
+	if value < 0 {
+		value *= -1
+	}
+	return value
 }
