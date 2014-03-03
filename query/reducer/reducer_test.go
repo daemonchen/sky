@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/skydb/sky/db"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 	"github.com/skydb/sky/query/mapper"
 	"github.com/skydb/sky/query/parser"
 	"github.com/skydb/sky/query/reducer"
@@ -142,10 +142,10 @@ func withTable(properties []*db.Property, objects map[string][]*db.Event, shardC
 }
 
 // Executes a query against a multiple shards and return the results.
-func runDBMappers(shardCount int, query string, properties []*db.Property, objects map[string][]*db.Event, fn func(*db.Table, []*hashmap.Hashmap) error) error {
+func runDBMappers(shardCount int, querystring string, properties []*db.Property, objects map[string][]*db.Event, fn func(*db.Table, []*query.Hashmap) error) error {
 	err := withTable(properties, objects, shardCount, func(table *db.Table) error {
 		// Create a query.
-		q := parser.New().MustParseString(query)
+		q := parser.New().MustParseString(querystring)
 		for _, property := range properties {
 			q.DeclaredVarDecls = append(q.DeclaredVarDecls, ast.NewVarDecl(property.ID, property.Name, property.DataType))
 		}
@@ -159,9 +159,9 @@ func runDBMappers(shardCount int, query string, properties []*db.Property, objec
 		// m.Dump()
 
 		// Execute the mappers.
-		results := make([]*hashmap.Hashmap, 0)
+		results := make([]*query.Hashmap, 0)
 		table.ForEach(func(c *db.Cursor) {
-			result := hashmap.New()
+			result := query.NewHashmap()
 			if err = m.Map(c, "", result); err != nil {
 				panic("map error: " + err.Error())
 			}
@@ -178,17 +178,17 @@ func runDBMappers(shardCount int, query string, properties []*db.Property, objec
 }
 
 // Executes a query against a given set of data, reduces it and return the reduced results.
-func runDBMapReducer(shardCount int, query string, properties []*db.Property, objects map[string][]*db.Event) (map[string]interface{}, error) {
+func runDBMapReducer(shardCount int, querystring string, properties []*db.Property, objects map[string][]*db.Event) (map[string]interface{}, error) {
 	var output map[string]interface{}
 
 	// Create a query.
-	q := parser.New().MustParseString(query)
+	q := parser.New().MustParseString(querystring)
 	for _, property := range properties {
 		q.DeclaredVarDecls = append(q.DeclaredVarDecls, ast.NewVarDecl(property.ID, property.Name, property.DataType))
 	}
 	q.Finalize()
 
-	err := runDBMappers(shardCount, query, properties, objects, func(table *db.Table, results []*hashmap.Hashmap) error {
+	err := runDBMappers(shardCount, querystring, properties, objects, func(table *db.Table, results []*query.Hashmap) error {
 		r := reducer.New(q, table)
 		for _, result := range results {
 			if err := r.Reduce(result); err != nil {

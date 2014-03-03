@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/skydb/sky/db"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
 	"github.com/skydb/sky/query/ast/validator"
-	"github.com/skydb/sky/query/hashmap"
 	"github.com/skydb/sky/query/mapper"
 	"github.com/skydb/sky/query/parser"
 	"github.com/skydb/sky/query/reducer"
@@ -102,7 +102,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 		wg.Add(1)
 		//go func(cursor *mdb.Cursor) {
 		defer cursor.Close()
-		result := hashmap.New()
+		result := query.NewHashmap()
 		if err := m.Map(cursor, prefix, result); err == nil {
 			results <- result
 		} else {
@@ -126,7 +126,7 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	r := reducer.New(q, t)
 	for result := range results {
 		switch result := result.(type) {
-		case *hashmap.Hashmap:
+		case *query.Hashmap:
 			if err := r.Reduce(result); err != nil {
 				return nil, err
 			}

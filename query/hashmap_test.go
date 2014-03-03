@@ -1,4 +1,4 @@
-package hashmap
+package query
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 
 // Ensure that integer values can be set and retrieved.
 func TestHashmapInt(t *testing.T) {
-	h := New()
+	h := NewHashmap()
 	defer h.Free()
 
 	max := 10000
@@ -22,7 +22,7 @@ func TestHashmapInt(t *testing.T) {
 
 // Ensure that float values can be set and retrieved.
 func TestHashmapFloat64(t *testing.T) {
-	h := New()
+	h := NewHashmap()
 	defer h.Free()
 
 	max := 10000
@@ -36,7 +36,7 @@ func TestHashmapFloat64(t *testing.T) {
 
 // Ensure that hashmap values can be retrieved.
 func TestHashmapSubmap(t *testing.T) {
-	h := New()
+	h := NewHashmap()
 	defer h.Free()
 	s0 := h.Submap(10)
 	s0.Set(100, 200)
@@ -48,7 +48,7 @@ func TestHashmapSubmap(t *testing.T) {
 
 // Ensure that retrieving a submap will overwrite an int value.
 func TestHashmapOverrideWithSubmap(t *testing.T) {
-	h := New()
+	h := NewHashmap()
 	defer h.Free()
 	h.Set(10, 100)
 	s0 := h.Submap(10)
@@ -58,7 +58,7 @@ func TestHashmapOverrideWithSubmap(t *testing.T) {
 
 // Ensure that retrieving an int will overwrite a submap value.
 func TestHashmapOverrideWithInt(t *testing.T) {
-	h := New()
+	h := NewHashmap()
 	defer h.Free()
 	h.Submap(10)
 	h.Set(10, 100)
@@ -68,13 +68,13 @@ func TestHashmapOverrideWithInt(t *testing.T) {
 // Ensure that iterator goes over each value once.
 func TestHashmapIterator(t *testing.T) {
 	count := 10000
-	h := New()
+	h := NewHashmap()
 	defer h.Free()
 	for i := 0; i < count; i++ {
 		h.Set(int64(i), 10)
 	}
 
-	iterator := NewIterator(h)
+	iterator := NewHashmapIterator(h)
 	results := make(map[int64]bool)
 	for {
 		key, _, ok := iterator.Next()
@@ -91,7 +91,7 @@ func TestHashmapIterator(t *testing.T) {
 
 // Runs the benchmark 10,000 times per iteration within the C context.
 func BenchmarkHashmapGet10k(b *testing.B) {
-	h := New()
+	h := NewHashmap()
 	for i := 0; i < BucketCount(); i++ {
 		h.Set(int64(i), 100)
 	}
@@ -104,7 +104,7 @@ func BenchmarkHashmapGet10k(b *testing.B) {
 
 // Runs the benchmark 10,000 times per iteration within the C context.
 func BenchmarkHashmapSet10k(b *testing.B) {
-	h := New()
+	h := NewHashmap()
 	for i := 0; i < b.N; i++ {
 		benchmarkSet(h, 10000)
 	}

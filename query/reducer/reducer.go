@@ -2,8 +2,8 @@ package reducer
 
 import (
 	"github.com/skydb/sky/db"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 )
 
 // Reducer takes the results of multiple mapper executions and combines
@@ -29,6 +29,6 @@ func (r *Reducer) Output() map[string]interface{} {
 }
 
 // Reduce executes the reducer against a hashmap returned from a Mapper.
-func (r *Reducer) Reduce(h *hashmap.Hashmap) error {
+func (r *Reducer) Reduce(h *query.Hashmap) error {
 	return r.reduceQuery(r.query, h)
 }

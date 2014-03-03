@@ -3,12 +3,12 @@ package reducer
 import (
 	"fmt"
 
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 )
 
 // reduceStatement executes the reducer for a single statement.
-func (r *Reducer) reduceStatement(node ast.Statement, h *hashmap.Hashmap, symtable *ast.Symtable) error {
+func (r *Reducer) reduceStatement(node ast.Statement, h *query.Hashmap, symtable *ast.Symtable) error {
 	symtable = ast.NodeSymtable(node, symtable)
 
 	switch node := node.(type) {
@@ -33,7 +33,7 @@ func (r *Reducer) reduceStatement(node ast.Statement, h *hashmap.Hashmap, symtab
 }
 
 // reduceStatements executes the reducer for multiple statements.
-func (r *Reducer) reduceStatements(nodes ast.Statements, h *hashmap.Hashmap, symtable *ast.Symtable) error {
+func (r *Reducer) reduceStatements(nodes ast.Statements, h *query.Hashmap, symtable *ast.Symtable) error {
 	for _, node := range nodes {
 		if err := r.reduceStatement(node, h, symtable); err != nil {
 			return err

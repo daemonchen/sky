@@ -2,8 +2,8 @@ package mapper
 
 import (
 	"github.com/axw/gollvm/llvm"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 )
 
 func (m *Mapper) codegenQuery(q *ast.Query) (llvm.Value, error) {
@@ -20,8 +20,8 @@ func (m *Mapper) codegenQuery(q *ast.Query) (llvm.Value, error) {
 	m.eventType = m.codegenEventType()
 	m.cursorType = m.codegenCursorType()
 
-	m.hashmapType = hashmap.DeclareType(m.module, m.context)
-	hashmap.Declare(m.module, m.context, m.hashmapType)
+	m.hashmapType = query.DeclareHashmapType(m.module, m.context)
+	query.DeclareHashmap(m.module, m.context, m.hashmapType)
 
 	llvm.AddFunction(m.module, "debug", llvm.FunctionType(m.context.VoidType(), []llvm.Type{llvm.PointerType(m.context.Int8Type(), 0)}, false))
 	m.codegenCursorExternalDecl()

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/axw/gollvm/llvm"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 )
 
 // [codegen]
@@ -49,7 +49,7 @@ func (m *Mapper) codegenField(node *ast.Field, tbl *ast.Symtable, index int) (ll
 }
 
 func (m *Mapper) codegenAggregateField(node *ast.Field, tbl *ast.Symtable, event llvm.Value, result llvm.Value) error {
-	id := hashmap.String(node.Identifier())
+	id := query.Hash(node.Identifier())
 
 	// The "count" aggregation is a special case since it doesn't require an expression.
 	if node.Aggregation == "count" {

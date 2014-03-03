@@ -9,8 +9,8 @@ import (
 
 	"github.com/axw/gollvm/llvm"
 	"github.com/skydb/sky/db"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 )
 
 var mutex sync.Mutex
@@ -98,7 +98,7 @@ func (m *Mapper) Close() {
 }
 
 // Execute runs the entry function on the execution engine.
-func (m *Mapper) Map(c *db.Cursor, prefix string, result *hashmap.Hashmap) error {
+func (m *Mapper) Map(c *db.Cursor, prefix string, result *query.Hashmap) error {
 	cursor := sky_cursor_new(c.Cursor, prefix)
 	defer sky_cursor_free(cursor)
 

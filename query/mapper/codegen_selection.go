@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/axw/gollvm/llvm"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 )
 
 // [codegen]
@@ -45,7 +45,7 @@ func (m *Mapper) codegenSelection(node *ast.Selection, tbl *ast.Symtable) (llvm.
 
 	m.builder.SetInsertPointAtEnd(name_lbl)
 	if node.Name != "" {
-		result = m.call("sky_hashmap_submap", result, m.constint(int(hashmap.String(node.Name))))
+		result = m.call("sky_hashmap_submap", result, m.constint(int(query.Hash(node.Name))))
 	}
 	m.br(dimensions_lbl)
 
@@ -57,7 +57,7 @@ func (m *Mapper) codegenSelection(node *ast.Selection, tbl *ast.Symtable) (llvm.
 			return nilValue, fmt.Errorf("Dimension variable not found: %s", dimension.Name)
 		}
 		value := m.load(m.structgep(event, decl.Index()))
-		result = m.call("sky_hashmap_submap", result, m.constint(int(hashmap.String(dimension.Name))))
+		result = m.call("sky_hashmap_submap", result, m.constint(int(query.Hash(dimension.Name))))
 		result = m.call("sky_hashmap_submap", result, value)
 	}
 	m.br(fields_lbl)

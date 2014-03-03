@@ -7,20 +7,20 @@ import (
 	"time"
 
 	"github.com/skydb/sky/db"
+	"github.com/skydb/sky/query"
 	"github.com/skydb/sky/query/ast"
-	"github.com/skydb/sky/query/hashmap"
 	"github.com/skydb/sky/query/mapper"
 	"github.com/skydb/sky/query/parser"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	HASH_EOF       = int64(hashmap.String("@eof"))
-	HASH_EOS       = int64(hashmap.String("@eos"))
-	HASH_ACTION    = int64(hashmap.String("action"))
-	HASH_FOO       = int64(hashmap.String("foo"))
-	HASH_COUNT     = int64(hashmap.String("count"))
-	HASH_SUM_MYVAR = int64(hashmap.String("sum_myVar"))
+	HASH_EOF       = int64(query.Hash("@eof"))
+	HASH_EOS       = int64(query.Hash("@eos"))
+	HASH_ACTION    = int64(query.Hash("action"))
+	HASH_FOO       = int64(query.Hash("foo"))
+	HASH_COUNT     = int64(query.Hash("count"))
+	HASH_SUM_MYVAR = int64(query.Hash("sum_myVar"))
 )
 
 func TestMapperSelectCount(t *testing.T) {
@@ -145,7 +145,7 @@ func TestMapperAssignment(t *testing.T) {
 }
 
 func TestMapperSessionLoop(t *testing.T) {
-	var h *hashmap.Hashmap
+	var h *query.Hashmap
 	query := `
 		FOR EACH SESSION DELIMITED BY 2 HOURS
 		  FOR EACH EVENT
@@ -237,9 +237,9 @@ func withTable(properties []*db.Property, objects map[string][]*db.Event, shardC
 }
 
 // Executes a query against a given set of data and return the results.
-func runDBMapper(query string, properties []*db.Property, objects map[string][]*db.Event) (*hashmap.Hashmap, error) {
-	var h *hashmap.Hashmap
-	err := runDBMappers(1, query, properties, objects, func(table *db.Table, results []*hashmap.Hashmap) error {
+func runDBMapper(querystring string, properties []*db.Property, objects map[string][]*db.Event) (*query.Hashmap, error) {
+	var h *query.Hashmap
+	err := runDBMappers(1, querystring, properties, objects, func(table *db.Table, results []*query.Hashmap) error {
 		if len(results) > 0 {
 			h = results[0]
 		}
@@ -249,10 +249,10 @@ func runDBMapper(query string, properties []*db.Property, objects map[string][]*
 }
 
 // Executes a query against a multiple shards and return the results.
-func runDBMappers(shardCount int, query string, properties []*db.Property, objects map[string][]*db.Event, fn func(*db.Table, []*hashmap.Hashmap) error) error {
+func runDBMappers(shardCount int, querystring string, properties []*db.Property, objects map[string][]*db.Event, fn func(*db.Table, []*query.Hashmap) error) error {
 	err := withTable(properties, objects, shardCount, func(table *db.Table) error {
 		// Create a query.
-		q := parser.New().MustParseString(query)
+		q := parser.New().MustParseString(querystring)
 		for _, property := range properties {
 			q.DeclaredVarDecls = append(q.DeclaredVarDecls, ast.NewVarDecl(property.ID, property.Name, property.DataType))
 		}
@@ -266,9 +266,9 @@ func runDBMappers(shardCount int, query string, properties []*db.Property, objec
 		// m.Dump()
 
 		// Execute the mappers.
-		results := make([]*hashmap.Hashmap, 0)
+		results := make([]*query.Hashmap, 0)
 		table.ForEach(func(c *db.Cursor) {
-			result := hashmap.New()
+			result := query.NewHashmap()
 			if err = m.Map(c, "", result); err != nil {
 				panic("map error: " + err.Error())
 			}

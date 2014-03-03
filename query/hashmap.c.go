@@ -1,4 +1,4 @@
-package hashmap
+package query
 
 /*
 #include <stdio.h>
@@ -280,7 +280,7 @@ type Hashmap struct {
 }
 
 // New creates a new Hashmap instance.
-func New() *Hashmap {
+func NewHashmap() *Hashmap {
 	return &Hashmap{C.sky_hashmap_new()}
 }
 
@@ -327,18 +327,18 @@ func (h *Hashmap) Submap(key int64) *Hashmap {
 	return &Hashmap{C.sky_hashmap_submap(h.C, C.int64_t(key))}
 }
 
-// Iterator wraps the underlying C struct.
-type Iterator struct {
+// HashmapIterator wraps the underlying C struct.
+type HashmapIterator struct {
 	C *C.sky_hashmap_iterator
 }
 
 // NewIterator creates a new HashmapIterator instance.
-func NewIterator(h *Hashmap) *Iterator {
-	return &Iterator{C.sky_hashmap_iterator_new(h.C)}
+func NewHashmapIterator(h *Hashmap) *HashmapIterator {
+	return &HashmapIterator{C.sky_hashmap_iterator_new(h.C)}
 }
 
 // Free releases the underlying C memory.
-func (i *Iterator) Free() {
+func (i *HashmapIterator) Free() {
 	if i.C != nil {
 		C.free(unsafe.Pointer(i.C))
 		i.C = nil
@@ -346,7 +346,7 @@ func (i *Iterator) Free() {
 }
 
 // Next retrieves the next key and a success flag.
-func (i *Iterator) Next() (int64, int, bool) {
+func (i *HashmapIterator) Next() (int64, int, bool) {
 	var key C.int64_t
 	var typ C.sky_hashmap_elem_type_e
 	success := bool(C.sky_hashmap_iterator_next(i.C, &key, &typ))
@@ -363,11 +363,11 @@ func benchmarkSet(h *Hashmap, n int64) {
 	C.sky_hashmap_benchmark_set(h.C, C.int64_t(n))
 }
 
-func DeclareType(m llvm.Module, c llvm.Context) llvm.Type {
+func DeclareHashmapType(m llvm.Module, c llvm.Context) llvm.Type {
 	return c.StructCreateNamed("sky_hashmap")
 }
 
-func Declare(m llvm.Module, c llvm.Context, hashmapType llvm.Type) {
+func DeclareHashmap(m llvm.Module, c llvm.Context, hashmapType llvm.Type) {
 	llvm.AddFunction(m, "sky_hashmap_new", llvm.FunctionType(llvm.PointerType(hashmapType, 0), []llvm.Type{}, false))
 	llvm.AddFunction(m, "sky_hashmap_free", llvm.FunctionType(c.VoidType(), []llvm.Type{llvm.PointerType(hashmapType, 0)}, false))
 	llvm.AddFunction(m, "sky_hashmap_get", llvm.FunctionType(c.Int64Type(), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type()}, false))
@@ -377,8 +377,8 @@ func Declare(m llvm.Module, c llvm.Context, hashmapType llvm.Type) {
 	llvm.AddFunction(m, "sky_hashmap_submap", llvm.FunctionType(llvm.PointerType(hashmapType, 0), []llvm.Type{llvm.PointerType(hashmapType, 0), c.Int64Type()}, false))
 }
 
-// String generates a hash id for strings.
-func String(s string) int64 {
+// Hash generates a hash id for strings.
+func Hash(s string) int64 {
 	h := fnv.New64a()
 	h.Reset()
 	h.Write([]byte(s))
