@@ -38,7 +38,9 @@ func (m *Mapper) codegenField(node *ast.Field, tbl *ast.Symtable, index int) (ll
 			return nilValue, err
 		}
 	} else {
-		panic("UNIMPLEMENTED")
+		if err := m.codegenNonAggregateField(node, tbl, event, result); err != nil {
+			return nilValue, err
+		}
 	}
 	m.br(exit)
 
@@ -92,6 +94,26 @@ func (m *Mapper) codegenAggregateField(node *ast.Field, tbl *ast.Symtable, event
 		m.call("sky_hashmap_set_double", m.load(result), m.constint(int(id)), newValue)
 	} else {
 		m.call("sky_hashmap_set", m.load(result), m.constint(int(id)), newValue)
+	}
+
+	return nil
+}
+
+func (m *Mapper) codegenNonAggregateField(node *ast.Field, tbl *ast.Symtable, event llvm.Value, result llvm.Value) error {
+	id := query.Hash(node.Identifier())
+
+	// Generate the field expression.
+	expressionValue, err := m.codegenExpression(node.Expression, event, tbl)
+	if err != nil {
+		return err
+	}
+
+	// Set the hashmap value.
+	fp := (expressionValue.Type().TypeKind() == llvm.DoubleTypeKind)
+	if fp {
+		m.call("sky_hashmap_set_double", m.load(result), m.constint(int(id)), expressionValue)
+	} else {
+		m.call("sky_hashmap_set", m.load(result), m.constint(int(id)), expressionValue)
 	}
 
 	return nil

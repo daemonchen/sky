@@ -30,6 +30,7 @@ func (m *Mapper) codegenSelection(node *ast.Selection, tbl *ast.Symtable) (llvm.
 	entry := m.context.AddBasicBlock(fn, "entry")
 	name_lbl := m.context.AddBasicBlock(fn, "name")
 	dimensions_lbl := m.context.AddBasicBlock(fn, "dimensions")
+	nonaggregate_submap_lbl := m.context.AddBasicBlock(fn, "nonaggregate_submap")
 	fields_lbl := m.context.AddBasicBlock(fn, "fields")
 	exit := m.context.AddBasicBlock(fn, "exit")
 
@@ -60,12 +61,27 @@ func (m *Mapper) codegenSelection(node *ast.Selection, tbl *ast.Symtable) (llvm.
 		result = m.call("sky_hashmap_submap", result, m.constint(int(query.Hash(dimension.Name))))
 		result = m.call("sky_hashmap_submap", result, value)
 	}
+	m.br(nonaggregate_submap_lbl)
+
+	// Non-aggregate queries are hashmaps treated like arrays of hashmaps.
+	// The index 0 value is the size of the hashmap. Value objectss are keys 1..*.
+	m.builder.SetInsertPointAtEnd(nonaggregate_submap_lbl)
+	hashmap := result
+	if node.HasNonAggregateFields() {
+		// Increment current count.
+		countValue := m.call("sky_hashmap_get", result, m.constint(int(0)))
+		countValue = m.add(countValue, m.constint(1))
+		m.call("sky_hashmap_set", result, m.constint(0), countValue)
+
+		// Create value object hashmap.
+		hashmap = m.call("sky_hashmap_submap", result, countValue)
+	}
 	m.br(fields_lbl)
 
 	// ...generate fields...
 	m.builder.SetInsertPointAtEnd(fields_lbl)
 	for _, fieldFn := range fieldFns {
-		m.call(fieldFn, m.load(cursor), result)
+		m.call(fieldFn, m.load(cursor), hashmap)
 	}
 	m.br(exit)
 

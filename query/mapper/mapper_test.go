@@ -21,6 +21,8 @@ var (
 	HASH_FOO       = int64(query.Hash("foo"))
 	HASH_COUNT     = int64(query.Hash("count"))
 	HASH_SUM_MYVAR = int64(query.Hash("sum_myVar"))
+	HASH_NAME      = int64(query.Hash("name"))
+	HASH_AGE       = int64(query.Hash("age"))
 )
 
 func TestMapperSelectCount(t *testing.T) {
@@ -182,6 +184,36 @@ func TestMapperSessionLoop(t *testing.T) {
 		assert.Equal(t, h.Submap(HASH_EOF).Submap(0).Submap(HASH_EOS).Submap(1).Get(HASH_COUNT), 1) // A0 eof=0 eos=1 count()
 		assert.Equal(t, h.Submap(HASH_EOF).Submap(1).Submap(HASH_EOS).Submap(0).Get(HASH_COUNT), 0) // A0 eof=1 eos=0 count()
 		assert.Equal(t, h.Submap(HASH_EOF).Submap(1).Submap(HASH_EOS).Submap(1).Get(HASH_COUNT), 1) // A0 eof=1 eos=1 count()
+	}
+}
+
+func TestMapperSelectNonAggregate(t *testing.T) {
+	query := `
+		FOR EACH EVENT
+			SELECT name, age
+		END
+	`
+	result, err := runDBMapper(query, []*db.Property{
+		{Name: "name", DataType: db.Factor, Transient: false},
+		{Name: "age", DataType: db.Integer, Transient: false},
+	}, map[string][]*db.Event{
+		"0001": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", "name", "john", "age", 10),
+			testevent("2000-01-01T00:00:02Z", "name", "john", "age", 20),
+		},
+		"0002": []*db.Event{
+			testevent("2000-01-01T00:00:00Z", "name", "susy", "age", 40),
+		},
+	})
+	assert.NoError(t, err)
+	if assert.NotNil(t, result) {
+		assert.Equal(t, result.Get(0), 3)                   // Value object count.
+		assert.Equal(t, result.Submap(1).Get(HASH_NAME), 1) // 1.name == 1 ("john")
+		assert.Equal(t, result.Submap(1).Get(HASH_AGE), 10) // 1.age == 10
+		assert.Equal(t, result.Submap(2).Get(HASH_NAME), 1) // 1.name == 1 ("john")
+		assert.Equal(t, result.Submap(2).Get(HASH_AGE), 20) // 1.age == 10
+		assert.Equal(t, result.Submap(3).Get(HASH_NAME), 2) // 1.name == 2 ("susy")
+		assert.Equal(t, result.Submap(3).Get(HASH_AGE), 40) // 1.age == 40
 	}
 }
 
