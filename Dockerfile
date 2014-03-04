@@ -34,6 +34,6 @@ RUN cd $SKY_PATH && make get
 # Build and install skyd.
 RUN cd $SKY_PATH && make install
 
-CMD ["-data-dir", "/var/lib/sky"]
-ENTRYPOINT /usr/local/bin/skyd
 EXPOSE 8585
+
+ENTRYPOINT ["/usr/local/bin/skyd", "-data-dir=/var/lib/sky"]
