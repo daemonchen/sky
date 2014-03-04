@@ -7,7 +7,7 @@ Sky is a database for storing behavioral data. It groups events by the actor who
 
 ## Getting Started
 
-Sky uses LLVM for query compilation so unless you have an hour to spare it is highly recommended that you use Docker. After you have [Docker installed](http://docs.docker.io/en/latest/installation/), you can run Sky by using the following command:
+Sky uses LLVM for query compilation so unless you have an hour to spare and a lot of hair to pull out then it is highly recommended that you use Docker. After you have [Docker installed](http://docs.docker.io/en/latest/installation/), you can run Sky by using the following command:
 
 ```sh
 # Start the Sky server.
