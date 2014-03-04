@@ -12,6 +12,9 @@ ENV SKYDB_PATH /go/src/github.com/skydb
 ENV SKY_PATH /go/src/github.com/skydb/sky
 ENV SKY_BRANCH llvm
 
+# Install git.
+RUN apt-get install -y git
+
 # Update linker configuration.
 RUN echo '/usr/local/lib' | tee /etc/ld.so.conf.d/sky.conf > /dev/null
 RUN ldconfig
@@ -22,10 +25,9 @@ RUN mkdir -p $SKYDB_PATH
 
 # Download Sky to its appropriate GOPATH location.
 RUN cd $SKYDB_PATH && \
-    wget -O sky.tar.gz https://github.com/skydb/sky/archive/$SKY_BRANCH.tar.gz && \
-    tar zxvf sky.tar.gz && \
-    mv sky-$SKY_BRANCH sky && \
-    cd sky
+    git clone https://github.com/skydb/sky.git && \
+    cd sky && \
+    git checkout $SKY_BRANCH
 
 # Retrieve Sky dependencies.
 RUN cd $SKY_PATH && make get
