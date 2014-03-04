@@ -2,65 +2,42 @@
 
 ## Overview
 
-The Sky database is used to store partially transient, temporal hashes.
-This might not seem useful at first but it is a powerful construct when storing and analyzing behavioral data such as clickstreams, logs, and sensor data.
-Hashes have a loose core associated with them to determine whether each property is transient or permanent and the property's data type.
+Sky is a database for storing behavioral data. It groups events by the actor who performed the event and stores the events in chronological order for fast querying. It's similar to a time series database except that event data can optionally persist over time.
 
-For example, let's say you want to analyze the behavior of users on your web site and combine it with other data in your database.
-Each user would have a hash in Sky.
-You want to track some properties on the hash over time such as the user's gender or current residence.
-These are permanent properties and will be set to a value until changed.
-
-Then there are properties that only exist such as the name of an action being taken or details about that action.
-For instance, you might track an `action` property with values of `signup` or `checkout`.
-You might also want to track the `purchase_amount` for the checkout action.
-These are properties that exist only for the exact moment in which they occur.
-
-Sky stores all this data efficiently for querying so you can aggregate these events at blazingly fast speeds.
-For instance, on a typical commodity server you can run a funnel analysis at the rate of ~10MM events/core/second.
 
 ## Getting Started
 
-To build Sky from source, you'll first need to install LevelDB, LuaJIT & csky.
+Sky uses LLVM for query compilation so unless you have an hour to spare it is highly recommended that you use Docker. After you have [Docker installed](http://docs.docker.io/en/latest/installation/), you can run Sky by using the following command:
 
 ```sh
-$ sudo make deps
-$ go get
+# Start the Sky server.
+$ docker run -t -i -p 8585:8585 skydb/sky-llvm
+
+# -t -i:          Run as an interactive shell so you can CTRL-C to stop.
+# -p 8585:8585:   Map port 8585 to the host machine.
+# skydb/sky-llvm: The name of the trusted build.
 ```
 
-Then to install the Sky server, run:
+You should see the following in the Docker shell:
+
+```
+Sky v0.4.0 (llvm/179a26d)
+Listening on http://localhost:8585
+```
+
+From another shell, verify that you can hit the server:
 
 ```sh
-$ make
-$ sudo make install
+$ curl http://localhost:8585
+{"sky":"welcome","version":"v0.4.0 (llvm/179a26d)"}
 ```
-
-Linux users: You'll need to make sure that `/usr/local/lib` is in your ldconfig.
-You can add it by running this:
-
-```sh
-$ echo '/usr/local/lib' | sudo tee /etc/ld.so.conf.d/sky.conf
-$ sudo ldconfig
-```
-
-Now your environment is setup and you can run `skyd` to start the server:
-
-```sh
-$ sudo skyd
-```
-
-If you visit `http://localhost:8585` (the default host:port) you should be greeted by a welcome message along with the current version of sky you are running.
-
-> NOTE: Sky cannot be built using Go 1.1.2 on Mac OS X because of [a known bug](https://github.com/szferi/gomdb/issues/10).
-> Please use Go 1.1.1 or Go 1.2.
 
 
 ## API
 
 ### Overview
 
-Sky uses a RESTful JSON over HTTP API.
-Below you can find Table, Property, Event and Query endpoints.
+Sky uses a RESTful JSON over HTTP API. Below you can find Table, Property, Event and Query endpoints.
 The examples below use cURL but there are also client libraries available for different languages.
 
 ### Table API
