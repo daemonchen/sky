@@ -33,6 +33,9 @@ get:
 grammar:
 	${MAKE} -C query/parser
 
+install: build
+	mv bin/skyd /usr/local/bin/skyd
+
 run: grammar version
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run ./cmd/skyd/main.go ./cmd/skyd/config.go
 

@@ -33,8 +33,8 @@ RUN cd $SKYDB_PATH && \
 RUN cd $SKY_PATH && make get
 
 # Build and install skyd into GOBIN.
-RUN cd $SKY_PATH && make build && mv skyd $GOBIN/skyd
+RUN cd $SKY_PATH && make install
 
-ENTRYPOINT /go/bin/skyd -nosync=$SKY_NOSYNC -max-dbs=$SKY_MAX_DBS> -max-readers=$SKY_MAX_READERS
+ENTRYPOINT /usr/local/bin/skyd -no-sync=$SKY_NOSYNC -max-dbs=$SKY_MAX_DBS -max-readers=$SKY_MAX_READERS
 
 EXPOSE 8585
