@@ -26,9 +26,9 @@ fmt:
 	go fmt ./...
 
 get:
-	curl https://raw.github.com/axw/gollvm/master/install.sh | sh
 	$(GO) get github.com/stretchr/testify
-	$(GO) get ./...
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) get github.com/axw/gollvm/llvm
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) get ./cmd/... ./db/... ./hash/... ./query/... ./server/... ./version/...
 
 grammar:
 	${MAKE} -C query/parser

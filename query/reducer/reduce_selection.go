@@ -24,6 +24,9 @@ func (r *Reducer) reduceSelection(node *ast.Selection, h *query.Hashmap, tbl *as
 func (r *Reducer) reduceSelectionDimensions(node *ast.Selection, h *query.Hashmap, output map[string]interface{}, dimensions []*ast.VarRef, tbl *ast.Symtable) error {
 	// Reduce fields if we've reached the end of the dimensions.
 	if len(dimensions) == 0 {
+
+		// TODO: If non-aggregate, loop over each key and build an array.
+
 		for _, field := range node.Fields {
 			if err := r.reduceField(field, h, output, tbl); err != nil {
 				return err
