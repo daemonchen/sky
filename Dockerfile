@@ -7,13 +7,9 @@ MAINTAINER Sky Contributors skydb.io
 
 # Initialize environment variables.
 ENV GOPATH /go
-ENV GOBIN /go/bin
 ENV SKYDB_PATH /go/src/github.com/skydb
 ENV SKY_PATH /go/src/github.com/skydb/sky
 ENV SKY_BRANCH llvm
-ENV SKY_NO_SYNC true
-ENV SKY_MAX_DBS 4096
-ENV SKY_MAX_READERS 126
 
 # Install git.
 RUN apt-get install -y git
@@ -23,7 +19,7 @@ RUN echo '/usr/local/lib' | tee /etc/ld.so.conf.d/sky.conf > /dev/null
 RUN ldconfig
 
 # Set up required directories.
-RUN mkdir -p $GOBIN
+RUN mkdir -p /var/lib/sky
 RUN mkdir -p $SKYDB_PATH
 
 # Download Sky to its appropriate GOPATH location.
@@ -35,9 +31,9 @@ RUN cd $SKYDB_PATH && \
 # Retrieve Sky dependencies.
 RUN cd $SKY_PATH && make get
 
-# Build and install skyd into GOBIN.
+# Build and install skyd.
 RUN cd $SKY_PATH && make install
 
-ENTRYPOINT /usr/local/bin/skyd -no-sync=$SKY_NO_SYNC -max-dbs=$SKY_MAX_DBS -max-readers=$SKY_MAX_READERS
-
+CMD ["-data-dir", "/var/lib/sky"]
+ENTRYPOINT /usr/local/bin/skyd
 EXPOSE 8585

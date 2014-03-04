@@ -62,9 +62,19 @@ func main() {
 	s.MaxDBs = config.MaxDBs
 	s.MaxReaders = config.MaxReaders
 
-	// Start the server.
+	// Print configuration.
 	log.Printf("Sky %s", version.String())
-	log.Printf("Listening on http://localhost%s\n", s.Addr)
+	log.Printf("Listening on http://localhost%s", s.Addr)
+	log.Println("")
+	log.Println("[config]")
+	log.Printf("port        = %v", config.Port)
+	log.Printf("data-dir    = %v", config.DataDir)
+	log.Printf("no-sync     = %v", s.NoSync)
+	log.Printf("max-dbs     = %v", s.MaxDBs)
+	log.Printf("max-readers = %v", s.MaxReaders)
+	log.Println("")
+
+	// Start the server.
 	log.SetFlags(log.LstdFlags)
 	log.Fatal(s.ListenAndServe())
 }
