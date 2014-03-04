@@ -11,6 +11,9 @@ ENV GOBIN /go/bin
 ENV SKYDB_PATH /go/src/github.com/skydb
 ENV SKY_PATH /go/src/github.com/skydb/sky
 ENV SKY_BRANCH llvm
+ENV SKY_NO_SYNC true
+ENV SKY_MAX_DBS 4096
+ENV SKY_MAX_READERS 126
 
 # Install git.
 RUN apt-get install -y git
@@ -35,6 +38,6 @@ RUN cd $SKY_PATH && make get
 # Build and install skyd into GOBIN.
 RUN cd $SKY_PATH && make install
 
-ENTRYPOINT /usr/local/bin/skyd -no-sync=$SKY_NOSYNC -max-dbs=$SKY_MAX_DBS -max-readers=$SKY_MAX_READERS
+ENTRYPOINT /usr/local/bin/skyd -no-sync=$SKY_NO_SYNC -max-dbs=$SKY_MAX_DBS -max-readers=$SKY_MAX_READERS
 
 EXPOSE 8585
