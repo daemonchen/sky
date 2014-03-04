@@ -32,18 +32,9 @@ $ curl http://localhost:8585
 {"sky":"welcome","version":"v0.4.0 (llvm/179a26d)"}
 ```
 
-### Setting ulimit
+#### Setting ulimit
 
-If you're using a large number of tables then you'll need to change your docker
-upstart to support the higher ulimit:
-
-1. `/etc/init/docker.conf`: Add `limit nofile 65536 65536` after start/stop.
-
-2. `/etc/init/docker.conf`: Add `ulimit -n 65536` as the first line in your `script` block.
-
-3. Run `service stop docker`
-
-4. Run `service start docker`
+If you're using a large number of tables then you'll need to change your docker upstart to support the higher ulimit. Inside`/etc/init/docker.conf` you'll need to add `limit nofile 65536 65536` after start/stop and add `ulimit -n 65536` as the first line in your `script` block. Then run `service stop docker` and `service start docker`.
 
 
 ## API
