@@ -18,10 +18,10 @@ const (
 	Patch = 0
 
 	// Branch is the branch that Sky was built from.
-	Branch = "" + branchMarker
+	Branch = "llvm" + branchMarker
 
 	// Commit is the short SHA1 git commit Sky was built from.
-	Commit = "" + commitMarker
+	Commit = "14bdba9" + commitMarker
 )
 
 // String returns the full version string.
