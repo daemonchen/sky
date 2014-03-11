@@ -133,7 +133,7 @@ func (t *Table) _open() error {
 	// Open the LMDB environment.
 	if err := env.Open(t.path, options, 0600); err != nil {
 		env.Close()
-		return &Error{"table open error", err}
+		return ErrTableOpen
 	}
 	t.env = env
 
@@ -221,7 +221,7 @@ func (t *Table) load() error {
 	return t.txn(mdb.RDONLY, func(txn *transaction) error {
 		value, err := txn.get("meta", []byte("meta"))
 		if err != nil {
-			return &Error{"table meta error", err}
+			return ErrTableMetaError
 		} else if len(value) == 0 {
 			return nil
 		}
@@ -644,18 +644,18 @@ func (t *Table) ForEach(fn func(c *Cursor)) error {
 	for i := 0; i < t.shardCount; i++ {
 		txn, err := t.env.BeginTxn(nil, mdb.RDONLY)
 		if err != nil {
-			return &Error{"foreach txn error", err}
+			return fmt.Errorf("foreach txn error: %s", err)
 		}
 
 		shardDBName := shardDBName(i)
 		dbi, err := txn.DBIOpen(&shardDBName, 0)
 		if err != nil {
-			return &Error{"foreach dbi error", err}
+			return fmt.Errorf("foreach dbi error: %s", err)
 		}
 
 		c, err := txn.CursorOpen(dbi)
 		if err != nil {
-			return &Error{"foreach cursor error", err}
+			return fmt.Errorf("foreach cursor error: %s", err)
 		}
 
 		fn(&Cursor{c})
@@ -902,14 +902,14 @@ func (t *Table) unmarshal(data []byte) error {
 func (t *Table) txn(flags uint, fn func(*transaction) error) error {
 	txn, err := t.env.BeginTxn(nil, flags)
 	if err != nil {
-		return &Error{"txn error", err}
+		return fmt.Errorf("txn error: %s", err)
 	}
 	if err := fn(&transaction{txn}); err != nil {
 		txn.Abort()
 		return err
 	}
 	if err := txn.Commit(); err != nil {
-		return &Error{"txn commit error", err}
+		return fmt.Errorf("txn commit error: %s", err)
 	}
 	return nil
 }
@@ -974,7 +974,7 @@ func (t *Table) toEvent(e *rawEvent) (*Event, error) {
 					return nil, err
 				}
 			} else {
-				return nil, &Error{fmt.Sprintf("invalid factor value: %v", v), nil}
+				return nil, fmt.Errorf("invalid factor value: %v", v)
 			}
 		}
 

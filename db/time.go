@@ -2,12 +2,8 @@ package db
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
-)
-
-var (
-	// ErrInvalidTimestamp is returned when parsing a non-RFC3339 timestamp.
-	ErrInvalidTimestamp = &Error{"invalid timestamp", nil}
 )
 
 // SecondsBitOffset is the number of bits used to store subseconds in Sky time.
@@ -17,7 +13,7 @@ const SecondsBitOffset = 20
 func ParseTime(s string) (time.Time, error) {
 	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
-		return t, ErrInvalidTimestamp
+		return t, fmt.Errorf("invalid timestamp: %q", s)
 	}
 	return t.UTC(), nil
 }

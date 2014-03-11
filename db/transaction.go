@@ -27,7 +27,7 @@ type transaction struct {
 func (t *transaction) dbi(name string, flags uint) error {
 	_, err := t.DBIOpen(&name, mdb.CREATE|flags)
 	if err != nil {
-		return &Error{"dbi error", err}
+		return fmt.Errorf("dbi error: %s", err)
 	}
 	return nil
 }
@@ -36,12 +36,12 @@ func (t *transaction) dbi(name string, flags uint) error {
 func (t *transaction) get(name string, key []byte) ([]byte, error) {
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return nil, &Error{"dbi error", err}
+		return nil, fmt.Errorf("dbi error: %s", err)
 	}
 
 	value, err := t.Get(dbi, []byte(key))
 	if err != nil && err != mdb.NotFound {
-		return nil, &Error{"get error", err}
+		return nil, fmt.Errorf("get error: %s", err)
 	}
 	return value, nil
 }
@@ -50,7 +50,7 @@ func (t *transaction) get(name string, key []byte) ([]byte, error) {
 func (t *transaction) getAt(name string, key, prefix []byte) ([]byte, error) {
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return nil, &Error{fmt.Sprintf("dbi error (%s)", name), err}
+		return nil, fmt.Errorf("dbi error: %s: %s", name, err)
 	}
 
 	c, err := t.CursorOpen(dbi)
@@ -85,7 +85,7 @@ func (t *transaction) getAt(name string, key, prefix []byte) ([]byte, error) {
 func (t *transaction) getAll(name string, key []byte) ([][]byte, error) {
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return nil, &Error{fmt.Sprintf("dbi error (%s)", name), err}
+		return nil, fmt.Errorf("dbi error: %s: ", name, err)
 	}
 
 	c, err := t.CursorOpen(dbi)
@@ -117,7 +117,7 @@ func (t *transaction) getAll(name string, key []byte) ([][]byte, error) {
 		if _, _, err := c.Get(key, mdb.NEXT_DUP); err == mdb.NotFound {
 			break
 		} else if err != nil {
-			return nil, &Error{"next dup error", err}
+			return nil, fmt.Errorf("next dup error: %s", err)
 		}
 	}
 
@@ -128,11 +128,11 @@ func (t *transaction) getAll(name string, key []byte) ([][]byte, error) {
 func (t *transaction) put(name string, key []byte, value []byte) error {
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return &Error{"dbi error", err}
+		return fmt.Errorf("dbi error: %s", err)
 	}
 
 	if err := t.Put(dbi, []byte(key), value, mdb.NODUPDATA); err != nil {
-		return &Error{"put error", err}
+		return fmt.Errorf("put error: %s", err)
 	}
 	return nil
 }
@@ -146,11 +146,11 @@ func (t *transaction) putAt(name string, key, prefix, value []byte) error {
 
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return &Error{"dbi error", err}
+		return fmt.Errorf("dbi error: %s", err)
 	}
 
 	if err := t.Put(dbi, []byte(key), value, mdb.NODUPDATA); err != nil {
-		return &Error{"txn error", err}
+		return fmt.Errorf("txn error: %s", err)
 	}
 	return nil
 }
@@ -159,10 +159,10 @@ func (t *transaction) putAt(name string, key, prefix, value []byte) error {
 func (t *transaction) del(name string, key []byte) error {
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return &Error{"dbi error", err}
+		return fmt.Errorf("dbi error: %s", err)
 	}
 	if err := t.Del(dbi, []byte(key), nil); err != nil && err != mdb.NotFound {
-		return &Error{"del error", err}
+		return fmt.Errorf("del error: %s", err)
 	}
 	return nil
 }
@@ -171,7 +171,7 @@ func (t *transaction) del(name string, key []byte) error {
 func (t *transaction) delAt(name string, key, prefix []byte) error {
 	dbi, err := t.DBIOpen(&name, 0)
 	if err != nil {
-		return &Error{"dbi error", err}
+		return fmt.Errorf("dbi error: %s", err)
 	}
 
 	c, err := t.CursorOpen(dbi)

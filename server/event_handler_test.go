@@ -48,7 +48,7 @@ func TestServerEventGetWithInvalidTimestamp(t *testing.T) {
 		setupTestTable("foo")
 		code, resp := getJSON("/tables/foo/objects/xyz/events/bad_timestamp")
 		assert.Equal(t, code, 500)
-		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp"}`)
+		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp: \"bad_timestamp\""}`)
 	})
 }
 
@@ -58,7 +58,7 @@ func TestServerEventInsertWithInvalidTimestamp(t *testing.T) {
 		setupTestTable("foo")
 		code, resp := putJSON("/tables/foo/objects/xyz/events/bad_timestamp", `{"data":{"bar":"myValue", "baz":12}}`)
 		assert.Equal(t, code, 500)
-		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp"}`)
+		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp: \"bad_timestamp\""}`)
 	})
 }
 
@@ -68,7 +68,7 @@ func TestServerEventDeleteWithInvalidTimestamp(t *testing.T) {
 		setupTestTable("foo")
 		code, resp := deleteJSON("/tables/foo/objects/xyz/events/bad_timestamp", ``)
 		assert.Equal(t, code, 500)
-		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp"}`)
+		assert.Equal(t, jsonenc(resp), `{"message":"invalid timestamp: \"bad_timestamp\""}`)
 	})
 }
 
