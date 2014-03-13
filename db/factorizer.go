@@ -73,7 +73,7 @@ func (f *Factorizer) Open(path string) error {
 	} else if err := f.env.SetMaxReaders(f.MaxReaders); err != nil {
 		f.close()
 		return fmt.Errorf("factor maxreaders error: %s", err)
-	} else if err := f.env.SetMapSize(2 << 36); err != nil {
+	} else if err := f.env.SetMapSize(2 << 38); err != nil {
 		f.close()
 		return fmt.Errorf("factor map size error: %s", err)
 	}
