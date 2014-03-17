@@ -21,7 +21,7 @@ const (
 	Branch = "llvm" + branchMarker
 
 	// Commit is the short SHA1 git commit Sky was built from.
-	Commit = "14bdba9" + commitMarker
+	Commit = "" + commitMarker
 )
 
 // String returns the full version string.

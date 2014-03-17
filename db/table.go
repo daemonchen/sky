@@ -133,7 +133,7 @@ func (t *Table) _open() error {
 	// Open the LMDB environment.
 	if err := env.Open(t.path, options, 0600); err != nil {
 		env.Close()
-		return ErrTableOpen
+		return fmt.Errorf("lmdb open error: " + err.Error())
 	}
 	t.env = env
 

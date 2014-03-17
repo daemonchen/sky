@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -62,6 +63,9 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	prefix, ok := data["prefix"].(string)
 	if !ok {
 		prefix = req.Var("prefix")
+	}
+	if prefix == "" {
+		return nil, errors.New("prefix required")
 	}
 
 	// Parse query.
