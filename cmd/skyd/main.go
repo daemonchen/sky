@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/skydb/sky/cmd"
 	"github.com/skydb/sky/server"
-	"github.com/skydb/sky/version"
 )
+
+var branch, commit string
 
 var config = NewConfig()
 var configPath string
@@ -57,13 +59,13 @@ func main() {
 
 	// Initialize
 	s := server.NewServer(config.Port, config.DataDir)
-	s.Version = version.String()
+	s.Version = cmd.Version()
 	s.NoSync = config.NoSync
 	s.MaxDBs = config.MaxDBs
 	s.MaxReaders = config.MaxReaders
 
 	// Print configuration.
-	log.Printf("Sky %s", version.String())
+	log.Printf("Sky %s (%s %s)", cmd.Version(), branch, commit)
 	log.Printf("Listening on http://localhost%s", s.Addr)
 	log.Println("")
 	log.Println("[config]")
