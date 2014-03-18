@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -51,7 +52,7 @@ func (db *DB) Open(path string) error {
 
 	// Create directory if it doesn't exist.
 	if err := os.MkdirAll(db.path, 0700); err != nil {
-		return err
+		return fmt.Errorf("db open error: %s", err)
 	}
 
 	return nil

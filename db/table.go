@@ -109,7 +109,7 @@ func (t *Table) _open() error {
 
 	// Initialize directory.
 	if err := os.MkdirAll(t.path, 0700); err != nil {
-		return err
+		return fmt.Errorf("table mkdir error: %s", err)
 	}
 
 	// Create LMDB environment.
@@ -193,7 +193,7 @@ func (t *Table) drop() error {
 	// Close table and delete everything.
 	t._close()
 	if err := os.RemoveAll(t.path); err != nil {
-		return err
+		return fmt.Errorf("remove all error: %s", err)
 	}
 
 	return nil
@@ -473,7 +473,7 @@ func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get raw event error: %s", err)
 	} else if b == nil {
 		return nil, nil
 	}
@@ -500,7 +500,7 @@ func (t *Table) getRawEvents(id string) ([]*rawEvent, error) {
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get raw events error: %s", err)
 	} else if slices == nil {
 		return nil, nil
 	}
@@ -552,7 +552,7 @@ func (t *Table) InsertObjects(objects map[string][]*Event) error {
 	for id, events := range objects {
 		for _, event := range events {
 			if err := t.insertEvent(id, event); err != nil {
-				return err
+				return fmt.Errorf("insert objects error: %s", err)
 			}
 		}
 	}
@@ -566,7 +566,7 @@ func (t *Table) insertEvent(id string, e *Event) error {
 	// Convert to raw event.
 	rawEvent, err := t.toRawEvent(e)
 	if err != nil {
-		return err
+		return fmt.Errorf("insert event error: %s", err)
 	}
 
 	// Retrieve existing event for object at the same moment and merge.
@@ -591,9 +591,13 @@ func (t *Table) insertEvent(id string, e *Event) error {
 	prefix := buf.Bytes()
 
 	// Insert event into appropriate shard.
-	return t.txn(0, func(txn *transaction) error {
+	err = t.txn(0, func(txn *transaction) error {
 		return txn.putAt(shardDBName(t.shardIndex(id)), []byte(id), prefix, b)
 	})
+	if err != nil {
+		return fmt.Errorf("insert event txn error: %s")
+	}
+	return nil
 }
 
 // DeleteEvent removes a single event for an object at a given timestamp.
@@ -610,9 +614,13 @@ func (t *Table) DeleteEvent(id string, timestamp time.Time) error {
 	prefix := buf.Bytes()
 
 	// Delete the event.
-	return t.txn(0, func(txn *transaction) error {
+	err := t.txn(0, func(txn *transaction) error {
 		return txn.delAt(shardDBName(t.shardIndex(id)), []byte(id), prefix)
 	})
+	if err != nil {
+		return fmt.Errorf("delete event txn error: %s", err)
+	}
+	return err
 }
 
 // DeleteEvents removes all events for an object.
@@ -624,9 +632,13 @@ func (t *Table) DeleteEvents(id string) error {
 	}
 
 	// Delete all events.
-	return t.txn(0, func(txn *transaction) error {
+	err := t.txn(0, func(txn *transaction) error {
 		return txn.del(shardDBName(t.shardIndex(id)), []byte(id))
 	})
+	if err != nil {
+		return fmt.Errorf("delete events txn error: %s", err)
+	}
+	return nil
 }
 
 // Merge combines two existing objects together.
@@ -637,6 +649,8 @@ func (t *Table) Merge(destId, srcId string) error {
 
 // ForEach executes a function once for each shard in the table.
 // A different cursor is passed in for each function invocation.
+//
+// IMPORTANT: The function is responsible for closing the cursor.
 func (t *Table) ForEach(fn func(c *Cursor)) error {
 	if !t.opened() {
 		return ErrTableNotOpen
@@ -673,7 +687,7 @@ func (t *Table) Keys() ([]string, error) {
 		}
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("keys error: %s", err)
 	}
 	sort.Strings(keys)
 	return keys, nil
@@ -704,14 +718,14 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
 		data, err := txn.get(factorDBName(propertyID), factorKey(value))
 		if err != nil {
-			return err
+			return fmt.Errorf("factorize txn get error: %s", err)
 		} else if data != nil {
 			val = int(binary.BigEndian.Uint64(data))
 		}
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("factorize txn error: %s", err)
 	} else if val != 0 {
 		return val, nil
 	}
@@ -730,7 +744,7 @@ func (t *Table) addFactor(propertyID int, value string) (int, error) {
 		// Look up next sequence index.
 		data, err := txn.get(factorDBName(propertyID), []byte("+"))
 		if err != nil {
-			return err
+			return fmt.Errorf("add factor txn get error: %s", err)
 		} else if data == nil {
 			data = make([]byte, 8)
 		}
@@ -742,7 +756,7 @@ func (t *Table) addFactor(propertyID int, value string) (int, error) {
 		// Save incremented index.
 		binary.BigEndian.PutUint64(data, uint64(index))
 		if err = txn.put(factorDBName(propertyID), []byte("+"), data); err != nil {
-			return err
+			return fmt.Errorf("add factor txn get error: %s", err)
 		}
 
 		// Truncate the value so it fits in our max key size.
@@ -751,17 +765,17 @@ func (t *Table) addFactor(propertyID int, value string) (int, error) {
 		// Store the value-to-index lookup.
 		binary.BigEndian.PutUint64(data[:], uint64(index))
 		if err := txn.put(factorDBName(propertyID), factorKey(value), data); err != nil {
-			return err
+			return fmt.Errorf("add factor txn put error: %s", err)
 		}
 
 		// Save the index-to-value lookup.
 		if err := txn.put(factorDBName(propertyID), reverseFactorKey(index), []byte(value)); err != nil {
-			return err
+			return fmt.Errorf("add factor put reverse error: %s", err)
 		}
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("add factor error: %s", err)
 	}
 
 	// Add to cache.
@@ -796,7 +810,7 @@ func (t *Table) defactorize(propertyID int, index int) (string, error) {
 		return err
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("defactorize error: %s", err)
 	} else if data == nil {
 		return "", ErrFactorNotFound
 	}
@@ -845,7 +859,7 @@ func truncateFactor(value string) string {
 func (t *Table) Stat() (*Stat, error) {
 	stat, err := t.env.Stat()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("txn stat error: %s", err)
 	}
 	info, err := t.env.Info()
 	if err != nil {

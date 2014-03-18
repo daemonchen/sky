@@ -72,7 +72,7 @@ func (t *transaction) getAt(name string, key, prefix []byte) ([]byte, error) {
 		if mdb.Errno(ret) == mdb.NotFound {
 			return nil, nil
 		}
-		return nil, mdb.Errno(ret)
+		return nil, fmt.Errorf("getAt error: %s", mdb.Errno(ret))
 	}
 	value := C.GoBytes(v.mv_data, C.int(v.mv_size))
 	if !bytes.HasPrefix(value, prefix) {
@@ -90,7 +90,7 @@ func (t *transaction) getAll(name string, key []byte) ([][]byte, error) {
 
 	c, err := t.CursorOpen(dbi)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getAll cursor error: %s", err)
 	}
 	defer c.Close()
 
@@ -103,13 +103,13 @@ func (t *transaction) getAll(name string, key []byte) ([][]byte, error) {
 	if mdb.Errno(ret) == mdb.NotFound {
 		return nil, nil
 	} else if ret != mdb.SUCCESS {
-		return nil, mdb.Errno(ret)
+		return nil, fmt.Errorf("getAll cursor_get error: %s", mdb.Errno(ret))
 	}
 
 	var values [][]byte
 	for _, v, err := c.Get(key, mdb.GET_CURRENT); err != mdb.NotFound; _, v, err = c.Get(key, mdb.GET_CURRENT) {
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getAll cursor iterate error: %s", err)
 		}
 		values = append(values, v)
 
@@ -141,7 +141,7 @@ func (t *transaction) put(name string, key []byte, value []byte) error {
 func (t *transaction) putAt(name string, key, prefix, value []byte) error {
 	// First delete any existing value.
 	if err := t.delAt(name, key, prefix); err != nil {
-		return err
+		return fmt.Errorf("putAt del error: %s", err)
 	}
 
 	dbi, err := t.DBIOpen(&name, 0)
@@ -176,7 +176,7 @@ func (t *transaction) delAt(name string, key, prefix []byte) error {
 
 	c, err := t.CursorOpen(dbi)
 	if err != nil {
-		return err
+		return fmt.Errorf("delAt cursor error: %s", err)
 	}
 	defer c.Close()
 
@@ -193,11 +193,14 @@ func (t *transaction) delAt(name string, key, prefix []byte) error {
 		if mdb.Errno(ret) == mdb.NotFound {
 			return nil
 		}
-		return mdb.Errno(ret)
+		return fmt.Errorf("delAt cursor_get error: %s", mdb.Errno(ret))
 	}
 	value := C.GoBytes(v.mv_data, C.int(v.mv_size))
 	if !bytes.HasPrefix(value, prefix) {
 		return nil
 	}
-	return c.Del(0)
+	if err := c.Del(0); err != nil {
+		return fmt.Errorf("delAt del error: %s", err)
+	}
+	return nil
 }
