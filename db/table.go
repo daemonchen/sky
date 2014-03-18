@@ -592,10 +592,13 @@ func (t *Table) insertEvent(id string, e *Event) error {
 
 	// Insert event into appropriate shard.
 	err = t.txn(0, func(txn *transaction) error {
-		return txn.putAt(shardDBName(t.shardIndex(id)), []byte(id), prefix, b)
+		if err := txn.putAt(shardDBName(t.shardIndex(id)), []byte(id), prefix, b); err != nil {
+			return fmt.Errorf("insert event put error: %s", err)
+		}
+		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("insert event txn error: %s")
+		return fmt.Errorf("insert event txn error: %s", err)
 	}
 	return nil
 }
