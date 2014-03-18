@@ -1,34 +1,19 @@
-package version
+package cmd
 
 import "fmt"
 
 const (
-	branchMarker = ""
-	commitMarker = ""
+	// MajorVersion is the major version.
+	MajorVersion = 0
+
+	// MinorVersion is the minor version.
+	MinorVersion = 4
+
+	// PatchVersion is the patch level.
+	PatchVersion = 0
 )
 
-const (
-	// Major is the major version.
-	Major = 0
-
-	// Minor is the minor version.
-	Minor = 4
-
-	// Patch is the patch level.
-	Patch = 0
-
-	// Branch is the branch that Sky was built from.
-	Branch = "llvm" + branchMarker
-
-	// Commit is the short SHA1 git commit Sky was built from.
-	Commit = "" + commitMarker
-)
-
-// String returns the full version string.
-func String() string {
-	version := fmt.Sprintf("v%d.%d.%d", Major, Minor, Patch)
-	if Branch != "" && Commit != "" {
-		return fmt.Sprintf("%s (%s/%s)", version, Branch, Commit)
-	}
-	return version
+// Version returns the full version string.
+func Version() string {
+	return fmt.Sprintf("v%d.%d.%d", MajorVersion, MinorVersion, PatchVersion)
 }
