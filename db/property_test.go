@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"errors"
 	"testing"
 
 	. "github.com/skydb/sky/db"
@@ -10,19 +11,19 @@ import (
 // Ensure that property names cannot be blank.
 func TestPropertyValidateNameNonBlank(t *testing.T) {
 	p := &Property{DataType: "string"}
-	assert.Equal(t, p.Validate(), ErrInvalidPropertyName)
+	assert.Equal(t, p.Validate(), errors.New("invalid property name: "))
 }
 
 // Ensure that property names cannot have invalid characters.
 func TestPropertyValidateNameInvalidCharacters(t *testing.T) {
 	p := &Property{Name: `foo\bar`, DataType: "string"}
-	assert.Equal(t, p.Validate(), ErrInvalidPropertyName)
+	assert.Equal(t, p.Validate(), errors.New("invalid property name: foo\\bar"))
 }
 
 // Ensure that property has a valid data type.
 func TestPropertyValidateDataType(t *testing.T) {
 	p := &Property{Name: `foo`, DataType: "ahhh!!"}
-	assert.Equal(t, p.Validate(), ErrInvalidDataType)
+	assert.Equal(t, p.Validate(), errors.New("invalid data type: ahhh!!"))
 }
 
 // Ensure that a String property can cast a value appropriately.

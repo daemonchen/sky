@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -53,7 +54,7 @@ func TestTableCreatePropertyNotOpen(t *testing.T) {
 		table, err := db.CreateTable("foo", 0)
 		db.Close()
 		p, err := table.CreateProperty("prop", Integer, false)
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, errors.New("table not open: foo"), err)
 		assert.Nil(t, p)
 	})
 }
@@ -64,7 +65,7 @@ func TestTableCreatePropertyDuplicateName(t *testing.T) {
 		table, err := db.CreateTable("foo", 0)
 		table.CreateProperty("prop", Integer, false)
 		p, err := table.CreateProperty("prop", Float, false)
-		assert.Equal(t, err, ErrPropertyExists)
+		assert.Equal(t, err, errors.New("property already exists: prop"))
 		assert.Nil(t, p)
 	})
 }
@@ -74,7 +75,7 @@ func TestTableCreatePropertyInvalid(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		table, err := db.CreateTable("foo", 0)
 		p, err := table.CreateProperty("my•prop", Integer, false)
-		assert.Equal(t, err, ErrInvalidPropertyName)
+		assert.Equal(t, err, errors.New("invalid property name: my•prop"))
 		assert.Nil(t, p)
 	})
 }
@@ -97,7 +98,7 @@ func TestTableRenamePropertyNotOpen(t *testing.T) {
 		table, err := db.CreateTable("foo", 0)
 		db.Close()
 		p, err := table.RenameProperty("prop", "prop2")
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, p)
 	})
 }
@@ -107,7 +108,7 @@ func TestTableRenamePropertyNotFound(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		table, err := db.CreateTable("foo", 0)
 		p, err := table.RenameProperty("prop", "prop2")
-		assert.Equal(t, err, ErrPropertyNotFound)
+		assert.Equal(t, err, errors.New("property not found: prop"))
 		assert.Nil(t, p)
 	})
 }
@@ -119,7 +120,7 @@ func TestTableRenamePropertyAlreadyExists(t *testing.T) {
 		table.CreateProperty("prop", Integer, false)
 		table.CreateProperty("prop2", Integer, false)
 		p, err := table.RenameProperty("prop", "prop2")
-		assert.Equal(t, err, ErrPropertyExists)
+		assert.Equal(t, err, errors.New("property already exists: prop2"))
 		assert.Nil(t, p)
 	})
 }
@@ -163,7 +164,7 @@ func TestTableDeletePropertyNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		err := table.DeleteProperty("prop2")
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 	})
 }
 
@@ -172,7 +173,7 @@ func TestTableDeletePropertyNotFound(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		table, _ := db.CreateTable("foo", 0)
 		err := table.DeleteProperty("prop2")
-		assert.Equal(t, err, ErrPropertyNotFound)
+		assert.Equal(t, err, errors.New("property not found: prop2"))
 	})
 }
 
@@ -195,7 +196,7 @@ func TestTablePropertiesNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		p, err := table.Properties()
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, p)
 	})
 }
@@ -219,7 +220,7 @@ func TestTablePropertiesByIDNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		p, err := table.PropertiesByID()
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, p)
 	})
 }
@@ -230,7 +231,7 @@ func TestTablePropertyNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		p, err := table.Property("foo")
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, p)
 	})
 }
@@ -262,7 +263,7 @@ func TestTablePropertyByIDNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		p, err := table.PropertyByID(-1)
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, p)
 	})
 }
@@ -299,7 +300,7 @@ func TestTableGetEventNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		e, err := table.GetEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, e)
 	})
 }
@@ -310,7 +311,7 @@ func TestTableGetEventsNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		events, err := table.GetEvents("user1")
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 		assert.Nil(t, events)
 	})
 }
@@ -390,7 +391,7 @@ func TestTableInsertEventNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		err := table.InsertEvent("user1", newEvent("2000-01-01T00:00:01Z", "prop1", 20, "prop2", "bob"))
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 	})
 }
 
@@ -454,7 +455,7 @@ func TestTableDeleteEventNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		err := table.DeleteEvent("user1", mustParseTime("2000-01-01T00:00:01Z"))
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 	})
 }
 
@@ -507,7 +508,7 @@ func TestTableDeleteEventsNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		err := table.DeleteEvents("user1")
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 	})
 }
 
@@ -517,7 +518,7 @@ func TestTableInsertEventsNotOpen(t *testing.T) {
 		table, _ := db.CreateTable("foo", 0)
 		db.Close()
 		err := table.InsertEvents("user1", []*Event{newEvent("2000-01-01T00:00:01Z", "prop1", 20, "prop2", "bob")})
-		assert.Equal(t, err, ErrTableNotOpen)
+		assert.Equal(t, err, errors.New("table not open: foo"))
 	})
 }
 

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,15 @@ const (
 
 	// DefaultMaxReaders is the default limit of readers that Sky can use.
 	DefaultMaxReaders = uint(126)
+)
+
+var (
+	// ErrDatabaseNotOpen is returned when an operation is being attempted but
+	// the database is not in an open state.
+	ErrDatabaseNotOpen = errors.New("database not open")
+
+	// ErrTableNameRequired is returned when open a table without a name.
+	ErrTableNameRequired = errors.New("table name required")
 )
 
 // DB represents Sky's file-backed data store.
@@ -43,7 +53,7 @@ func (db *DB) Open(path string) error {
 
 	// Return an error if the database is currently opened.
 	if db.path != "" {
-		return ErrDatabaseOpen
+		return fmt.Errorf("database already open")
 	}
 
 	// Initialize poperties.
@@ -78,15 +88,19 @@ func (db *DB) close() {
 func (db *DB) CreateTable(name string, shardCount int) (*Table, error) {
 	db.Lock()
 	defer db.Unlock()
+	if db.path == "" {
+		return nil, ErrDatabaseNotOpen
+	} else if name == "" {
+		return nil, ErrTableNameRequired
+	}
 
-	if _, err := db.openTable(name); err == nil {
-		return nil, ErrTableExists
-	} else if err != ErrTableNotFound {
-		return nil, err
+	// Make sure the table doesn't exist.
+	t := db.table(name)
+	if t.Exists() {
+		return nil, fmt.Errorf("table already exists: %s", name)
 	}
 
 	// Create table.
-	t := db.table(name)
 	t.shardCount = shardCount
 	if err := t.create(); err != nil {
 		return nil, err
@@ -108,7 +122,7 @@ func (db *DB) DropTable(name string) error {
 	// Find the table.
 	t := db.table(name)
 	if !t.Exists() {
-		return ErrTableNotFound
+		return fmt.Errorf("table not found: %s", name)
 	}
 
 	// Drop table and remove it from the cache.

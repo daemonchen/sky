@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -23,6 +24,12 @@ const maxKeySize = 500
 // FactorCacheSize is the number of factors that are stored in the LRU cache.
 // This cache size is per-property.
 const FactorCacheSize = 1000
+
+var (
+	// ErrObjectIDRequired is returned inserting, deleting, or retrieving
+	// event data without specifying an object identifier.
+	ErrObjectIDRequired = errors.New("object id required")
+)
 
 // Table represents a collection of objects.
 type Table struct {
@@ -104,7 +111,7 @@ func (t *Table) _open() error {
 	if t.env != nil {
 		return nil
 	} else if !t.Exists() {
-		return ErrTableNotFound
+		return fmt.Errorf("table not found: %s", t.name)
 	}
 
 	// Initialize directory.
@@ -221,7 +228,7 @@ func (t *Table) load() error {
 	return t.txn(mdb.RDONLY, func(txn *transaction) error {
 		value, err := txn.get("meta", []byte("meta"))
 		if err != nil {
-			return ErrTableMetaError
+			return fmt.Errorf("table meta error: %s", err)
 		} else if len(value) == 0 {
 			return nil
 		}
@@ -247,7 +254,7 @@ func (t *Table) Properties() (map[string]*Property, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 	return t.properties, nil
 }
@@ -257,7 +264,7 @@ func (t *Table) PropertiesByID() (map[int]*Property, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 	return t.propertiesByID, nil
 }
@@ -267,7 +274,7 @@ func (t *Table) Property(name string) (*Property, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 	return t.properties[name], nil
 }
@@ -277,7 +284,7 @@ func (t *Table) PropertyByID(id int) (*Property, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 	return t.propertiesByID[id], nil
 }
@@ -287,12 +294,12 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 
 	// Don't allow duplicate names.
 	if t.properties[name] != nil {
-		return nil, ErrPropertyExists
+		return nil, fmt.Errorf("property already exists: %s", name)
 	}
 
 	// Create and validate property.
@@ -352,11 +359,11 @@ func (t *Table) RenameProperty(oldName, newName string) (*Property, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	} else if t.properties[oldName] == nil {
-		return nil, ErrPropertyNotFound
+		return nil, fmt.Errorf("property not found: %s", oldName)
 	} else if t.properties[newName] != nil {
-		return nil, ErrPropertyExists
+		return nil, fmt.Errorf("property already exists: %s", newName)
 	}
 
 	properties := t.properties
@@ -378,12 +385,12 @@ func (t *Table) DeleteProperty(name string) error {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 
 	p := t.properties[name]
 	if p == nil {
-		return ErrPropertyNotFound
+		return fmt.Errorf("property not found: %s", name)
 	}
 
 	properties, propertiesByID := t.properties, t.propertiesByID
@@ -419,7 +426,7 @@ func (t *Table) GetEvent(id string, timestamp time.Time) (*Event, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 	rawEvent, err := t.getRawEvent(id, shiftTime(timestamp))
 	if err != nil {
@@ -435,7 +442,7 @@ func (t *Table) GetEvents(id string) ([]*Event, error) {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return nil, ErrTableNotOpen
+		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
 
 	// Retrieve raw events.
@@ -522,7 +529,7 @@ func (t *Table) InsertEvent(id string, event *Event) error {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 	return t.insertEvent(id, event)
 }
@@ -532,7 +539,7 @@ func (t *Table) InsertEvents(id string, events []*Event) error {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 	for _, event := range events {
 		if err := t.insertEvent(id, event); err != nil {
@@ -547,7 +554,7 @@ func (t *Table) InsertObjects(objects map[string][]*Event) error {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 	for id, events := range objects {
 		for _, event := range events {
@@ -608,7 +615,7 @@ func (t *Table) DeleteEvent(id string, timestamp time.Time) error {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 
 	// Create the timestamp prefix.
@@ -631,7 +638,7 @@ func (t *Table) DeleteEvents(id string) error {
 	t.Lock()
 	defer t.Unlock()
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 
 	// Delete all events.
@@ -656,7 +663,7 @@ func (t *Table) Merge(destId, srcId string) error {
 // IMPORTANT: The function is responsible for closing the cursor.
 func (t *Table) ForEach(fn func(c *Cursor)) error {
 	if !t.opened() {
-		return ErrTableNotOpen
+		return fmt.Errorf("table not open: %s", t.name)
 	}
 	for i := 0; i < t.shardCount; i++ {
 		txn, err := t.env.BeginTxn(nil, mdb.RDONLY)
@@ -738,7 +745,7 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 		return t.addFactor(propertyID, value)
 	}
 
-	return 0, ErrFactorNotFound
+	return 0, fmt.Errorf("factor not found: %d: %s", propertyID, value)
 }
 
 func (t *Table) addFactor(propertyID int, value string) (int, error) {
@@ -815,7 +822,7 @@ func (t *Table) defactorize(propertyID int, index int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("defactorize error: %s", err)
 	} else if data == nil {
-		return "", ErrFactorNotFound
+		return "", fmt.Errorf("reverse factor not found: %d: %d", propertyID, index)
 	}
 
 	// Add to cache.
@@ -942,7 +949,7 @@ func (t *Table) toRawEvent(e *Event) (*rawEvent, error) {
 	for k, v := range e.Data {
 		p := t.properties[k]
 		if p == nil {
-			return nil, ErrPropertyNotFound
+			return nil, fmt.Errorf("property not found: %s", k)
 		}
 
 		// Cast the value to the appropriate type.

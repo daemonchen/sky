@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"regexp"
 )
 
@@ -19,14 +20,14 @@ type Property struct {
 func (p *Property) Validate() error {
 	// Validate that name is non-blank and doesn't contain invalid characters.
 	if p.Name == "" || !regexp.MustCompile(`^\w+$`).MatchString(p.Name) {
-		return ErrInvalidPropertyName
+		return fmt.Errorf("invalid property name: %s", p.Name)
 	}
 
 	// Validate data type.
 	switch p.DataType {
 	case Factor, String, Integer, Float, Boolean:
 	default:
-		return ErrInvalidDataType
+		return fmt.Errorf("invalid data type: %s", p.DataType)
 	}
 
 	return nil

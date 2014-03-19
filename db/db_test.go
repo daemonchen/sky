@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ func TestDBOpen(t *testing.T) {
 // Ensure that the database returns an error if opened while already open.
 func TestDBOpenAlreadyOpen(t *testing.T) {
 	withDB(func(db *DB, path string) {
-		assert.Equal(t, db.Open("/foo/bar"), ErrDatabaseOpen)
+		assert.Equal(t, errors.New("database already open"), db.Open("/foo/bar"))
 	})
 }
 
@@ -30,8 +31,8 @@ func TestDBCreateTable(t *testing.T) {
 		table, err := db.CreateTable("foo", 0)
 		if assert.NoError(t, err) {
 			assert.NotNil(t, table)
-			assert.Equal(t, table.Name(), "foo")
-			assert.Equal(t, filepath.Base(table.Path()), "foo")
+			assert.Equal(t, "foo", table.Name())
+			assert.Equal(t, "foo", filepath.Base(table.Path()))
 		}
 	})
 }
@@ -41,7 +42,7 @@ func TestDBCreateTableAlreadyExists(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		db.CreateTable("foo", 0)
 		table, err := db.CreateTable("foo", 0)
-		assert.Equal(t, err, ErrTableExists)
+		assert.Equal(t, errors.New("table already exists: foo"), err)
 		assert.Nil(t, table)
 	})
 }
@@ -50,7 +51,7 @@ func TestDBCreateTableAlreadyExists(t *testing.T) {
 func TestDBCreateTableWhileClosed(t *testing.T) {
 	var db DB
 	table, err := db.CreateTable("foo", 0)
-	assert.Equal(t, err, ErrDatabaseNotOpen)
+	assert.Equal(t, ErrDatabaseNotOpen, err)
 	assert.Nil(t, table)
 }
 
@@ -91,7 +92,7 @@ func TestDBDropTable(t *testing.T) {
 
 		// Opening it should return "not found".
 		table, err := db.OpenTable("foo")
-		assert.Equal(t, err, ErrTableNotFound)
+		assert.Equal(t, errors.New("table not found: foo"), err)
 		assert.Nil(t, table)
 	})
 }
@@ -110,7 +111,7 @@ func TestDBDropTableNotOpen(t *testing.T) {
 func TestDBDropTableNotFound(t *testing.T) {
 	withDB(func(db *DB, path string) {
 		err := db.DropTable("foo")
-		assert.Equal(t, err, ErrTableNotFound)
+		assert.Equal(t, err, errors.New("table not found: foo"))
 	})
 }
 
