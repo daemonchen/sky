@@ -62,7 +62,11 @@ func (s *Server) ListenAndServe() error {
 	defer s.Close()
 
 	// Initialize and open database.
-	s.db = &db.DB{}
+	s.db = &db.DB{
+		NoSync:     s.NoSync,
+		MaxDBs:     s.MaxDBs,
+		MaxReaders: s.MaxReaders,
+	}
 	if err := s.db.Open(s.path); err != nil {
 		return err
 	}
