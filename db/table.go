@@ -745,7 +745,7 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 		return t.addFactor(propertyID, value)
 	}
 
-	return 0, fmt.Errorf("factor not found: %d: %s", propertyID, value)
+	return 0, nil
 }
 
 func (t *Table) addFactor(propertyID int, value string) (int, error) {
@@ -822,7 +822,7 @@ func (t *Table) defactorize(propertyID int, index int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("defactorize error: %s", err)
 	} else if data == nil {
-		return "", fmt.Errorf("reverse factor not found: %d: %d", propertyID, index)
+		return "", fmt.Errorf("factor not found: %d: %d", propertyID, index)
 	}
 
 	// Add to cache.

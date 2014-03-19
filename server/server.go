@@ -20,18 +20,24 @@ type Server struct {
 	sync.Mutex
 	*http.Server
 	*mux.Router
-	db       *db.DB
-	path     string
-	listener net.Listener
-	Version  string
+	db         *db.DB
+	path       string
+	listener   net.Listener
+	NoSync     bool
+	MaxDBs     uint
+	MaxReaders uint
+	Version    string
 }
 
 // NewServer creates a new Server instance.
 func NewServer(port uint, path string) *Server {
 	s := &Server{
-		Server: &http.Server{Addr: fmt.Sprintf(":%d", port)},
-		Router: mux.NewRouter(),
-		path:   path,
+		Server:     &http.Server{Addr: fmt.Sprintf(":%d", port)},
+		Router:     mux.NewRouter(),
+		path:       path,
+		NoSync:     false,
+		MaxDBs:     4096,
+		MaxReaders: 126,
 	}
 	s.Handler = s
 
