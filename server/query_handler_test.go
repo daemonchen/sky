@@ -29,11 +29,11 @@ func TestServerSimpleCountQuery(t *testing.T) {
 		// Run queries against 'foo' and 'bar'.
 		q := `SELECT count()`
 
-		status, resp := postJSON("/tables/foo/query", jsonenc(map[string]interface{}{"query": q}))
+		status, resp := postJSON("/tables/foo/query?prefix=", jsonenc(map[string]interface{}{"query": q}))
 		assert.Equal(t, 200, status)
 		assert.Equal(t, jsonenc(resp), `{"count":5}`)
 
-		status, resp = postJSON("/tables/bar/query", jsonenc(map[string]interface{}{"query": q}))
+		status, resp = postJSON("/tables/bar/query?prefix=", jsonenc(map[string]interface{}{"query": q}))
 		assert.Equal(t, 200, status)
 		assert.Equal(t, jsonenc(resp), `{"count":1}`)
 	})
@@ -252,6 +252,8 @@ func TestServerFSMQuery(t *testing.T) {
 		// Run query.
 		q := `
 			DECLARE state AS INTEGER
+			DECLARE bool AS BOOLEAN
+			SET bool = true
 			WHEN state == 0 THEN
 				SET state = 1
 				SELECT count() AS count INTO "visited"

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -64,9 +63,11 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	if !ok {
 		prefix = req.Var("prefix")
 	}
-	if prefix == "" {
-		return nil, errors.New("prefix required")
-	}
+	/*
+		if prefix == "" {
+			return nil, fmt.Errorf("prefix required")
+		}
+	*/
 
 	// Parse query.
 	q, err := parser.ParseString(querystring)

@@ -81,7 +81,7 @@ func TestServerInsertEventTooLarge(t *testing.T) {
 		// Send one large event (600 character string).
 		code, resp := putJSON("/tables/foo/objects/xyz/events/2012-01-01T02:00:00Z", `{"data":{"bar":"012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"}}`)
 		assert.Equal(t, code, 500)
-		assert.Equal(t, jsonenc(resp), `{"message":"txn error: MDB_BAD_VALSIZE: Too big key/data, key is empty, or wrong DUPFIXED size"}`)
+		assert.Equal(t, jsonenc(resp), `{"message":"insert event txn error: insert event put error: txn error: MDB_BAD_VALSIZE: Too big key/data, key is empty, or wrong DUPFIXED size"}`)
 	})
 }
 
@@ -163,17 +163,17 @@ func TestServerGenericStream(t *testing.T) {
 
 		// Send two new events in one request.
 		code, resp := patchJSON("/events", `{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assert.Equal(t, code, 200)
-		assert.Equal(t, jsonenc(resp), `{"count":4}`)
+		assert.Equal(t, 200, code)
+		assert.Equal(t, `{"count":4}`, jsonenc(resp))
 
 		// Check our work.
 		code, resp = getJSON("/tables/foo_1/objects/xyz/events")
-		assert.Equal(t, code, 200)
-		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
+		assert.Equal(t, 200, code)
+		assert.Equal(t, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`, jsonenc(resp))
 
 		code, resp = getJSON("/tables/foo_2/objects/xyz/events")
-		assert.Equal(t, code, 200)
-		assert.Equal(t, jsonenc(resp), `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`)
+		assert.Equal(t, 200, code)
+		assert.Equal(t, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`, jsonenc(resp))
 	})
 }
 
@@ -181,8 +181,8 @@ func TestServerGenericStream(t *testing.T) {
 func TestServerTableStreamNotFound(t *testing.T) {
 	runTestServer(func(s *Server) {
 		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assert.Equal(t, code, 404)
-		assert.Equal(t, jsonenc(resp), `{"message":"table not found"}`)
+		assert.Equal(t, 404, code)
+		assert.Equal(t, `{"message":"table not found: foo"}`, jsonenc(resp))
 	})
 }
 
@@ -213,6 +213,6 @@ func TestServerGenericStreamTableNotFound(t *testing.T) {
 	runTestServer(func(s *Server) {
 		code, resp := patchJSON("/events", `{"id":"xyz","table":"no_such_table","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
 		assert.Equal(t, code, 400)
-		assert.Equal(t, jsonenc(resp), `{"message":"table not found: no_such_table: 0"}`)
+		assert.Equal(t, jsonenc(resp), `{"message":"table not found: no_such_table: no_such_table: 0"}`)
 	})
 }
