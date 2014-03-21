@@ -1,39 +1,6 @@
-DECLARE first_location_country AS FACTOR(location_country)
-DECLARE visited_count AS INTEGER
-DECLARE cart_count AS INTEGER
-DECLARE reached_checkout_count AS INTEGER
-DECLARE purchased_count AS INTEGER
-DECLARE matched AS BOOLEAN
-
-WHEN @@timestamp > 1392872400 && @@timestamp < 1393217999 THEN
-  FOR EACH SESSION DELIMITED BY 30 MINUTES
-    SET first_location_country = location_country
-    SET visited_count = 0
-    SET cart_count = 0
-    SET reached_checkout_count = 0
-    SET purchased_count = 0
-    SET matched = false
-
-    FOR EACH EVENT
-      WHEN session_token != '' && (first_location_country != '') THEN
-        SET matched = true
-        WHEN action == 'visit' THEN
-          SET visited_count = 1
-        END
-        WHEN action == 'cart' THEN
-          SET cart_count = 1
-        END
-        WHEN action == 'reached_checkout' THEN
-          SET reached_checkout_count = 1
-        END
-        WHEN action == 'purchased' THEN
-          SET purchased_count = 1
-        END
-      END
-    END
-    
-    WHEN matched == true THEN
-      SELECT sum(visited_count) AS visited_count, sum(cart_count) AS cart_count, sum(reached_checkout_count) AS reached_checkout_count, sum(purchased_count) AS purchased_count, sum(subtotal_price + shipping + tax_added) AS total_sales GROUP BY first_location_country INTO 'query'
-    END
+FOR EACH SESSION DELIMITED BY 1 SECOND
+  SELECT count() GROUP BY @@timestamp INTO "sessions1"
+  FOR EACH EVENT
+    SELECT count() GROUP BY @@timestamp INTO "events"
   END
 END

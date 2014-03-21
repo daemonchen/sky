@@ -8,31 +8,12 @@ POST /tables/tbl/properties {"name":"shipping","dataType":"integer","transient":
 POST /tables/tbl/properties {"name":"tax","dataType":"integer","transient":true}
 POST /tables/tbl/properties {"name":"tax_added","dataType":"integer","transient":true}
 
-# User 0
-PATCH /tables/tbl/objects/user0/events/2014-02-20T17:31:08Z {"data":{"action":"visit","location_country":"ca","session_token":"6908A392-677D-4692-8EF3"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-20T17:31:10Z {"data":{"action":"visit","location_country":"ca","session_token":"6908A392-677D-4692-8EF3"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-20T17:31:12Z {"data":{"action":"visit","location_country":"ca","session_token":"6908A392-677D-4692-8EF4"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-20T17:32:08Z {"data":{"action":"cart","location_country":"ca","session_token":"6908A392-677D-4692-8EF3"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-20T17:32:14Z {"data":{"action":"cart","location_country":"us","session_token":"6908A392-677D-4692-8EF3"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-21T22:07:12Z {"data":{"action":"visit","location_country":"ca","session_token":"6908A392-677D-4692-8EF4"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-21T22:07:14Z {"data":{"action":"reached_checkout","location_country":"us","session_token":"6908A392-677D-4692-8EF3"}},
-PATCH /tables/tbl/objects/user0/events/2014-02-21T22:08:05.868505Z {"data":{"action":"purchased","location_country":"","session_token":"6908A392-677D-4692-8EF3","shipping":1000,"subtotal_price":1000,"tax":130,"tax_added":130}}
 
-# User 1
-PATCH /tables/tbl/objects/user1/events/2012-02-07T03:34:27Z {"data":{"action":"visit","location_country":"us","session_token":"AA3CDE53-7B74-7D35-E2C5"}}
-PATCH /tables/tbl/objects/user1/events/2012-02-07T03:35:27Z {"data":{"action":"cart","location_country":"us","session_token":"AA3CDE53-7B74-7D35-E2C5"}}
-PATCH /tables/tbl/objects/user1/events/2012-02-07T03:35:52Z {"data":{"action":"cart","location_country":"us","session_token":"AA3CDE53-7B74-7D35-E2C5"}}
-PATCH /tables/tbl/objects/user1/events/2014-01-01T03:34:27Z {"data":{"action":"cart","location_country":"us","session_token":"AA3CDE53-7B74-7D35-E2C5"}}
-PATCH /tables/tbl/objects/user1/events/2014-02-15T03:34:27Z {"data":{"action":"cart","location_country":"us","session_token":"AA3CDE53-7B74-7D35-E2C5"}}
 
-# User 2
+# User 2 (three sessions)
 PATCH /tables/tbl/objects/user2/events/2014-02-21T17:34:00Z {"data":{"action":"visit","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
+
 PATCH /tables/tbl/objects/user2/events/2014-02-22T17:34:00Z {"data":{"action":"visit","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
 PATCH /tables/tbl/objects/user2/events/2014-02-22T17:35:00Z {"data":{"action":"cart","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
-PATCH /tables/tbl/objects/user2/events/2014-02-22T23:47:35.261205Z {"data":{"action":"purchased","location_country":"","session_token":"B869712F-87AA-43FC-AD85","shipping":1000,"subtotal_price":2000,"tax":260,"tax_added":260}}
 
-# User 3
-PATCH /tables/tbl/objects/user3/events/2014-02-22T17:35:53Z {"data":{"action":"visit","location_country":"us","session_token":"FA9EDE53-8E29-4C56-A6B3"}}
-PATCH /tables/tbl/objects/user3/events/2014-02-23T00:10:54Z {"data":{"action":"cart","location_country":"us","session_token":"FA9EDE53-8E29-4C56-A6B3"}}
-PATCH /tables/tbl/objects/user3/events/2014-02-23T00:10:55Z {"data":{"action":"cart","location_country":"us","session_token":"FA9EDE53-8E29-4C56-A6B3"}}
-PATCH /tables/tbl/objects/user3/events/2014-02-24T00:10:56Z {"data":{"action":"cart","location_country":"us","session_token":"FA9EDE53-8E29-4C56-A6B3"}}
+PATCH /tables/tbl/objects/user2/events/2014-02-22T23:47:35.261205Z {"data":{"action":"purchased","location_country":"","session_token":"B869712F-87AA-43FC-AD85","shipping":1000,"subtotal_price":2000,"tax":260,"tax_added":260}}

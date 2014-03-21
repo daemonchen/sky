@@ -454,6 +454,7 @@ func testQueryFixture(t *testing.T, name string) {
 			panic("fixture output error: " + err.Error())
 		}
 		actual, _ := json.MarshalIndent(resp, "", "  ")
+		fmt.Println(string(actual))
 		assert.Equal(t, strings.TrimSpace(string(exp)), strings.TrimSpace(string(actual)))
 	})
 }

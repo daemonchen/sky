@@ -52,6 +52,7 @@ func (m *Mapper) codegenSessionLoop(node *ast.SessionLoop, tbl *ast.Symtable) (l
 	// cursor->session_idle_time = <SESSION_IDLE>;
 	m.builder.SetInsertPointAtEnd(init)
 	prevSessionIdleTime := m.load(m.structgep(m.load(cursor_ref), cursorSessionIdleTimeElementIndex))
+	m.printf("idle? %d\n", m.constint(node.IdleDuration))
 	m.store(m.constint(node.IdleDuration), m.structgep(m.load(cursor_ref), cursorSessionIdleTimeElementIndex))
 	m.br(loop)
 
