@@ -1,0 +1,20 @@
+{
+  "query": {
+    "first_location_country": {
+      "ca": {
+        "cart_count": 2,
+        "purchased_count": 1,
+        "reached_checkout_count": 1,
+        "total_sales": 2130,
+        "visited_count": 4
+      },
+      "us": {
+        "cart_count": 2,
+        "purchased_count": 0,
+        "reached_checkout_count": 0,
+        "total_sales": 0,
+        "visited_count": 1
+      }
+    }
+  }
+}

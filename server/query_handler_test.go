@@ -1,6 +1,14 @@
 package server
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -397,5 +405,55 @@ func TestServerQueryCount(t *testing.T) {
 		code, resp := getJSON("/tables/foo/count?prefix=001")
 		assert.Equal(t, code, 200)
 		assert.Equal(t, jsonenc(resp), `{"count":3}`)
+	})
+}
+
+func TestServerQueryFixture0001(t *testing.T) { testQueryFixture(t, "0001") }
+
+// Loads the "input", executes the "query", and checks it agains the "output".
+func testQueryFixture(t *testing.T, name string) {
+	runTestServer(func(s *Server) {
+		re := regexp.MustCompile(`^(\S+)\s+(\S+)\s+(.+)$`)
+
+		// Read and process input file.
+		f, err := os.Open(filepath.Join("fixtures", name, "input"))
+		if err != nil {
+			panic("fixtures error: " + err.Error())
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if len(line) == 0 || strings.HasPrefix(line, "#") {
+				continue
+			}
+			m := re.FindStringSubmatch(line)
+			if m == nil || len(m) != 4 {
+				panic("invalid fixture input: " + line)
+			}
+			method, path, body := m[1], m[2], m[3]
+			if statusCode, ret := sendJSON(method, path, body); statusCode != 200 {
+				panic(fmt.Sprintf("invalid fixture status code: %s %s: %d: %s", method, path, statusCode, jsonenc(ret)))
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			panic("scanner error: " + err.Error())
+		}
+		f.Close()
+
+		// Execute the query.
+		q, err := ioutil.ReadFile(filepath.Join("fixtures", name, "query"))
+		if err != nil {
+			panic("fixture query error: " + err.Error())
+		}
+		status, resp := postJSON("/tables/tbl/query", jsonenc(map[string]interface{}{"query": string(q)}))
+		assert.Equal(t, 200, status)
+
+		// Verify the output.
+		exp, err := ioutil.ReadFile(filepath.Join("fixtures", name, "output"))
+		if err != nil {
+			panic("fixture output error: " + err.Error())
+		}
+		actual, _ := json.MarshalIndent(resp, "", "  ")
+		assert.Equal(t, strings.TrimSpace(string(exp)), strings.TrimSpace(string(actual)))
 	})
 }
