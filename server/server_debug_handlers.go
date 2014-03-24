@@ -9,11 +9,15 @@ import (
 )
 
 func (s *Server) addDebugHandlers() {
-	s.router.HandleFunc("/debug/pprof", pprof.Index)
-	s.router.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	s.router.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	s.router.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	s.router.HandleFunc("/debug/pprof/{name}", pprof.Index)
+	s.router.Handle("/pprof/", http.HandlerFunc(pprof.Index))
+	s.router.Handle("/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	s.router.Handle("/pprof/profile", http.HandlerFunc(pprof.Profile))
+	s.router.Handle("/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+
+	s.router.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	s.router.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	s.router.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	s.router.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 
 	s.router.HandleFunc("/debug/vars", getVarsHandler)
 	s.router.HandleFunc("/debug/vars/{name}", getVarsHandler)
