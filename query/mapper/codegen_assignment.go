@@ -37,9 +37,36 @@ func (m *Mapper) codegenAssignment(node *ast.Assignment, tbl *ast.Symtable) (llv
 	}
 
 	// Codegen RHS expression.
-	expressionValue, err := m.codegenExpression(node.Expression, event, tbl)
-	if err != nil {
-		return nilValue, err
+	var expressionValue llvm.Value
+	switch expr := node.Expression.(type) {
+	case *ast.StringLiteral:
+		decl := tbl.Find(node.Target.Name)
+		name := decl.Association
+		if name == "" {
+			name = decl.Name
+		}
+
+		// Find property on table.
+		p, err := m.table.Property(name)
+		if err != nil {
+			return nilValue, err
+		} else if p == nil {
+			return nilValue, &Error{"variable not found: " + name, nil}
+		}
+
+		// Factorize value.
+		id, err := p.Factorize(expr.Value)
+		if err != nil {
+			return nilValue, err
+		}
+		expressionValue = m.constint(int(id))
+
+	default:
+		var err error
+		expressionValue, err = m.codegenExpression(expr, event, tbl)
+		if err != nil {
+			return nilValue, err
+		}
 	}
 
 	// Store expression value in variable.
