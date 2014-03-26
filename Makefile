@@ -14,7 +14,7 @@ bench: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.bench=. $(PKG)
 
 build: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -ldflags=$(GOLDFLAGS) -a -o bin/skyd ./cmd/skyd/main.go ./cmd/skyd/config.go
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) build -ldflags=$(GOLDFLAGS) -a -o bin/skyd ./cmd/skyd/main.go
 
 cover: fmt
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) -coverprofile=$(COVERPROFILE) $(PKG)
@@ -39,7 +39,7 @@ install: build
 	mv bin/skyd /usr/local/bin/skyd
 
 run: grammar
-	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run -ldflags=$(GOLDFLAGS) ./cmd/skyd/main.go ./cmd/skyd/config.go
+	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) run -ldflags=$(GOLDFLAGS) ./cmd/skyd/main.go
 
 test: grammar
 	CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS) $(GO) test -v -test.run=$(TEST) $(PKG)
