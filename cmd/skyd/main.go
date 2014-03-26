@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/BurntSushi/toml"
+	"github.com/davecheney/profile"
 	"github.com/skydb/sky/cmd"
 	"github.com/skydb/sky/server"
 )
@@ -32,6 +33,8 @@ var branch, commit string
 
 var config = NewConfig()
 var configPath string
+
+var profileFlag = flag.Bool("profile", false, "enable profiling")
 
 func init() {
 	log.SetFlags(0)
@@ -58,6 +61,11 @@ func main() {
 			fmt.Printf("Unable to parse config: %v\n", err)
 			os.Exit(1)
 		}
+	}
+
+	// Initialize profiling.
+	if *profileFlag {
+		defer profile.Start(&profile.Config{CPUProfile: true, MemProfile: true, BlockProfile: true}).Stop()
 	}
 
 	// Default the data directory to ~/.sky

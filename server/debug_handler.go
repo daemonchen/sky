@@ -9,11 +9,15 @@ import (
 )
 
 func installDebugHandler(s *Server) {
-	s.Router.HandleFunc("/debug/pprof", pprof.Index)
-	s.Router.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	s.Router.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	s.Router.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	s.Router.HandleFunc("/debug/pprof/{name}", pprof.Index)
+	s.Router.Handle("/pprof/", http.HandlerFunc(pprof.Index))
+	s.Router.Handle("/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	s.Router.Handle("/pprof/profile", http.HandlerFunc(pprof.Profile))
+	s.Router.Handle("/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+
+	s.Router.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	s.Router.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	s.Router.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	s.Router.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 
 	s.Router.HandleFunc("/debug/vars", getVarsHandler)
 	s.Router.HandleFunc("/debug/vars/{name}", getVarsHandler)
