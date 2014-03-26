@@ -97,17 +97,21 @@ func main() {
 	s.NoSync = config.NoSync
 	s.MaxDBs = config.MaxDBs
 	s.MaxReaders = config.MaxReaders
+	s.StreamFlushPeriod = config.StreamFlushPeriod
+	s.StreamFlushThreshold = config.StreamFlushThreshold
 
 	// Print configuration.
 	log.Printf("Sky %s (%s %s)", cmd.Version(), branch, commit)
 	log.Printf("Listening on http://localhost%s", s.Addr)
 	log.Println("")
 	log.Println("[config]")
-	log.Printf("port        = %v", config.Port)
-	log.Printf("data-dir    = %v", config.DataDir)
-	log.Printf("no-sync     = %v", s.NoSync)
-	log.Printf("max-dbs     = %v", s.MaxDBs)
-	log.Printf("max-readers = %v", s.MaxReaders)
+	log.Printf("port         = %v", config.Port)
+	log.Printf("data-dir     = %v", config.DataDir)
+	log.Printf("no-sync      = %v", s.NoSync)
+	log.Printf("max-dbs      = %v", s.MaxDBs)
+	log.Printf("max-readers  = %v", s.MaxReaders)
+	log.Printf("flush-period = %v", s.StreamFlushPeriod)
+	log.Printf("flush-thresh = %v", s.StreamFlushThreshold)
 	log.Println("")
 
 	// Start the server.

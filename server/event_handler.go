@@ -124,7 +124,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 
 	// Flush on a separate thread.
 	var mutex sync.Mutex
-	var flush chan bool
+	var flush = make(chan bool)
 	var closeNotifier = w.(http.CloseNotifier).CloseNotify()
 	var count = 0
 	var startTime = time.Now()
@@ -142,13 +142,14 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 			// Flush events.
 			mutex.Lock()
 			if err := t.InsertObjects(events); err != nil {
+				log.Printf("flush: %s", err)
+
 				h.Error(w, fmt.Sprintf("flush: %v: %d", err, count), http.StatusBadRequest)
 				req.Body.Close()
 				mutex.Unlock()
 				return
 			}
 			events = make(map[string][]*db.Event)
-			count = 0
 			mutex.Unlock()
 
 			if closed {
@@ -178,6 +179,8 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		events[message.ID] = append(events[message.ID], event)
 		count++
 		if count > int(flushThreshold) {
+			count = 0
+			fmt.Println("[flush]")
 			flush <- true
 		}
 		mutex.Unlock()
