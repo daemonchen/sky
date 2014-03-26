@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -30,8 +32,7 @@ func installEventHandler(s *Server) *eventHandler {
 	s.HandleFunc("/tables/{table}/objects/{id}/events/{timestamp}", EnsureMapHandler(EnsureTableHandler(HandleFunc(h.insertEvent)))).Methods("PUT", "PATCH")
 	s.HandleFunc("/tables/{table}/objects/{id}/events/{timestamp}", EnsureTableHandler(HandleFunc(h.deleteEvent))).Methods("DELETE")
 
-	s.Router.HandleFunc("/events", h.insertGenericEventStream).Methods("PATCH")
-	s.Router.HandleFunc("/tables/{table}/events", h.insertTableEventStream).Methods("PATCH")
+	s.Router.HandleFunc("/tables/{table}/events", h.insertEventStream).Methods("PATCH")
 
 	return h
 }
@@ -88,34 +89,73 @@ func (h *eventHandler) deleteEvent(s *Server, req Request) (interface{}, error) 
 	return nil, t.DeleteEvent(req.Var("id"), timestamp)
 }
 
-// insertEventStream is a bulk insertion end point for a single table.
-func (h *eventHandler) insertTableEventStream(w http.ResponseWriter, req *http.Request) {
+// insertEventStream is a bulk insertion end point for a table.
+func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Request) {
 	s := h.s
 	vars := mux.Vars(req)
 
 	// Open the requested table.
-	var t *db.Table
-	if vars["table"] != "" {
-		var err error
-		t, err = s.db.OpenTable(vars["table"])
-		if err != nil {
-			h.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	t, err := s.db.OpenTable(vars["table"])
+	if t == nil {
+		h.Error(w, "table not found: "+vars["table"], http.StatusNotFound)
+		return
+	} else if err != nil {
+		h.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	h.insertEventStream(w, req, t)
-}
+	// Check for flush period passed as a URL param.
+	flushPeriod := s.StreamFlushPeriod
+	if value, err := strconv.Atoi(req.FormValue("flush-period")); value > 0 {
+		flushPeriod = uint(value)
+	} else if err != nil && req.FormValue("flush-period") != "" {
+		h.Error(w, fmt.Sprintf("invalid flush-period: %s", req.FormValue("flush-period")), http.StatusBadRequest)
+		return
+	}
 
-// insertGenericEventStream is a bulk insertion end point for multiple tables.
-func (h *eventHandler) insertGenericEventStream(w http.ResponseWriter, req *http.Request) {
-	h.insertEventStream(w, req, nil)
-}
+	// Check for flush threshold/buffer passed as a URL param.
+	flushThreshold := s.StreamFlushThreshold
+	if value, err := strconv.Atoi(req.FormValue("flush-threshold")); value > 0 {
+		flushThreshold = uint(value)
+	} else if err != nil && req.FormValue("flush-threshold") != "" {
+		h.Error(w, fmt.Sprintf("invalid flush-threshold: %s", req.FormValue("flush-threshold")), http.StatusBadRequest)
+		return
+	}
 
-// insertEventStream is a bulk insertion end point.
-func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Request, defaultTable *db.Table) {
+	// Flush on a separate thread.
+	var mutex sync.Mutex
+	var flush chan bool
+	var closeNotifier = w.(http.CloseNotifier).CloseNotify()
 	var count = 0
 	var startTime = time.Now()
+	var events = make(map[string][]*db.Event)
+	go func() {
+		for {
+			var closed = false
+			select {
+			case <-time.After(time.Duration(flushPeriod) * time.Second):
+			case <-flush:
+			case <-closeNotifier:
+				closed = true
+			}
+
+			// Flush events.
+			mutex.Lock()
+			if err := t.InsertObjects(events); err != nil {
+				h.Error(w, fmt.Sprintf("flush: %v: %d", err, count), http.StatusBadRequest)
+				req.Body.Close()
+				mutex.Unlock()
+				return
+			}
+			events = make(map[string][]*db.Event)
+			count = 0
+			mutex.Unlock()
+
+			if closed {
+				return
+			}
+		}
+	}()
 
 	// Stream in JSON event objects.
 	var decoder = json.NewDecoder(req.Body)
@@ -127,28 +167,20 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		} else if err != nil {
 			h.Error(w, fmt.Sprintf("%v: %d", err, count), http.StatusBadRequest)
 			return
-		}
-
-		// Create the event.
-		var event = &db.Event{Timestamp: message.Timestamp, Data: message.Data}
-
-		// Find target table.
-		var t = defaultTable
-		if t == nil {
-			var err error
-			if t, err = h.s.db.OpenTable(message.Table); err != nil {
-				h.Error(w, fmt.Sprintf("%v: %s: %d", err, message.Table, count), http.StatusBadRequest)
-				return
-			}
-		}
-
-		// Insert event.
-		if err := t.InsertEvent(message.ID, event); err != nil {
-			h.Error(w, fmt.Sprintf("%v: %s: %d", err, message.ID, count), http.StatusBadRequest)
+		} else if message.ID == "" {
+			h.Error(w, "object id required", http.StatusBadRequest)
 			return
 		}
 
+		// Create the event and append.
+		var event = &db.Event{Timestamp: message.Timestamp, Data: message.Data}
+		mutex.Lock()
+		events[message.ID] = append(events[message.ID], event)
 		count++
+		if count > int(flushThreshold) {
+			flush <- true
+		}
+		mutex.Unlock()
 	}
 
 	// Write out total count.

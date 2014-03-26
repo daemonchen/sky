@@ -150,33 +150,6 @@ func TestServerTableStream(t *testing.T) {
 	})
 }
 
-// Ensure that we can put multiple events on the server at once, using table agnostic event stream.
-func TestServerGenericStream(t *testing.T) {
-	runTestServer(func(s *Server) {
-		setupTestTable("foo_1")
-		setupTestProperty("foo_1", "bar", false, "string")
-		setupTestProperty("foo_1", "baz", true, "integer")
-
-		setupTestTable("foo_2")
-		setupTestProperty("foo_2", "bar", false, "string")
-		setupTestProperty("foo_2", "baz", true, "integer")
-
-		// Send two new events in one request.
-		code, resp := patchJSON("/events", `{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","table":"foo_1","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}{"id":"xyz","table":"foo_2","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assert.Equal(t, 200, code)
-		assert.Equal(t, `{"count":4}`, jsonenc(resp))
-
-		// Check our work.
-		code, resp = getJSON("/tables/foo_1/objects/xyz/events")
-		assert.Equal(t, 200, code)
-		assert.Equal(t, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`, jsonenc(resp))
-
-		code, resp = getJSON("/tables/foo_2/objects/xyz/events")
-		assert.Equal(t, 200, code)
-		assert.Equal(t, `[{"data":{"bar":"myValue","baz":12},"timestamp":"2012-01-01T02:00:00Z"},{"data":{"bar":"myValue2"},"timestamp":"2012-01-01T03:00:00Z"}]`, jsonenc(resp))
-	})
-}
-
 // Ensure that streaming events to a table that doesn't exist returns an error.
 func TestServerTableStreamNotFound(t *testing.T) {
 	runTestServer(func(s *Server) {
@@ -203,16 +176,7 @@ func TestServerTableStreamObjectIDRequired(t *testing.T) {
 		setupTestProperty("foo", "bar", false, "string")
 		setupTestProperty("foo", "baz", true, "integer")
 		code, resp := patchJSON("/tables/foo/events", `{"id":"xyz","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assert.Equal(t, code, 400)
-		assert.Equal(t, jsonenc(resp), `{"message":"object id required: : 1"}`)
-	})
-}
-
-// Ensure that a generic event stream with a missing table returns an error.
-func TestServerGenericStreamTableNotFound(t *testing.T) {
-	runTestServer(func(s *Server) {
-		code, resp := patchJSON("/events", `{"id":"xyz","table":"no_such_table","timestamp":"2012-01-01T02:00:00Z","data":{"bar":"myValue", "baz":12}}{"id":"xyz","timestamp":"2012-01-01T03:00:00Z","data":{"bar":"myValue2"}}`)
-		assert.Equal(t, code, 400)
-		assert.Equal(t, jsonenc(resp), `{"message":"table not found: no_such_table: no_such_table: 0"}`)
+		assert.Equal(t, 400, code)
+		assert.Equal(t, `{"message":"object id required"}`, jsonenc(resp))
 	})
 }

@@ -27,6 +27,14 @@ const (
 
 	// DefaultMaxReaders is the default LMDB setting for MaxReaders.
 	DefaultMaxReaders = 126 // lmdb's default
+
+	// DefaultStreamFlushPeriod is the default length of time between flushing
+	// events from the bulk endpoint into LMDB.
+	DefaultStreamFlushPeriod = 60 // seconds
+
+	// DefaultStreamFlushThreshold is the default max number of events to stream
+	// in before flushing from the bulk endpoint into LMDB.
+	DefaultStreamFlushThreshold = 1000
 )
 
 var branch, commit string
@@ -44,6 +52,8 @@ func init() {
 	flag.BoolVar(&config.NoSync, "no-sync", config.NoSync, "use mdb.NOSYNC option, or not")
 	flag.UintVar(&config.MaxDBs, "max-dbs", config.MaxDBs, "max number of named btrees in the database (mdb.MaxDBs)")
 	flag.UintVar(&config.MaxReaders, "max-readers", config.MaxReaders, "max number of concurrenly executing queries (mdb.MaxReaders)")
+	flag.UintVar(&config.StreamFlushPeriod, "stream-flush-period", config.StreamFlushPeriod, "time period on which to flush streamed events")
+	flag.UintVar(&config.StreamFlushThreshold, "stream-flush-threshold", config.StreamFlushThreshold, "the maximum number of events (per table) in event stream before flush")
 	flag.StringVar(&configPath, "config", "", "the path to the config file")
 }
 
@@ -106,20 +116,24 @@ func main() {
 
 // Config represents the configuration settings used to start skyd.
 type Config struct {
-	Port       uint   `toml:"port"`
-	DataDir    string `toml:"data-dir"`
-	NoSync     bool   `toml:"no-sync"`
-	MaxDBs     uint   `toml:"max-dbs"`
-	MaxReaders uint   `toml:"max-readers"`
+	Port                 uint   `toml:"port"`
+	DataDir              string `toml:"data-dir"`
+	NoSync               bool   `toml:"no-sync"`
+	MaxDBs               uint   `toml:"max-dbs"`
+	MaxReaders           uint   `toml:"max-readers"`
+	StreamFlushPeriod    uint   `toml:"stream-flush-period"`
+	StreamFlushThreshold uint   `toml:"stream-flush-threshold"`
 }
 
 // NewConfig creates a new Config object with the default settings.
 func NewConfig() *Config {
 	return &Config{
-		Port:       DefaultPort,
-		NoSync:     DefaultNoSync,
-		MaxDBs:     DefaultMaxDBs,
-		MaxReaders: DefaultMaxReaders,
+		Port:                 DefaultPort,
+		NoSync:               DefaultNoSync,
+		MaxDBs:               DefaultMaxDBs,
+		MaxReaders:           DefaultMaxReaders,
+		StreamFlushPeriod:    DefaultStreamFlushPeriod,
+		StreamFlushThreshold: DefaultStreamFlushThreshold,
 	}
 }
 
