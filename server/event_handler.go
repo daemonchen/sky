@@ -183,6 +183,9 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		mutex.Unlock()
 	}
 
+	// Final flush.
+	flush <- true
+
 	// Write out total count.
 	json.NewEncoder(w).Encode(map[string]interface{}{"count": count})
 
