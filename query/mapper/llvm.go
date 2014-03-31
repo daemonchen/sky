@@ -109,6 +109,14 @@ func (m *Mapper) structgep(value llvm.Value, index int, name ...string) llvm.Val
 	return m.builder.CreateStructGEP(value, index, fname(name))
 }
 
+func (m *Mapper) isEOS(cursor, event, next_event llvm.Value) llvm.Value {
+	timestamp := m.load(m.structgep(event, eventTimestampElementIndex), "timestamp")
+	nextTimestamp := m.load(m.structgep(next_event, eventTimestampElementIndex), "next_timestamp")
+	sessionIdleTime := m.load(m.structgep(m.load(cursor), cursorSessionIdleTimeElementIndex), "session_idle_time")
+	maxTimestamp := m.add(timestamp, sessionIdleTime, "max_timestamp")
+	return m.and(m.icmp(llvm.IntSGT, sessionIdleTime, m.constint(0)), m.icmp(llvm.IntSLE, maxTimestamp, nextTimestamp))
+}
+
 func fname(names []string) string {
 	if len(names) > 0 {
 		return names[0]

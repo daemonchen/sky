@@ -36,6 +36,7 @@ func (m *Mapper) codegenSessionLoop(node *ast.SessionLoop, tbl *ast.Symtable) (l
 
 	entry := m.context.AddBasicBlock(fn, "entry")
 	init := m.context.AddBasicBlock(fn, "init")
+	set_eos := m.context.AddBasicBlock(fn, "set_eos")
 	loop := m.context.AddBasicBlock(fn, "loop")
 	next_event := m.context.AddBasicBlock(fn, "next_event")
 	exit := m.context.AddBasicBlock(fn, "exit")
@@ -50,10 +51,16 @@ func (m *Mapper) codegenSessionLoop(node *ast.SessionLoop, tbl *ast.Symtable) (l
 
 	// int64_t prev_session_idle_time = cursor->session_idle_time;
 	// cursor->session_idle_time = <SESSION_IDLE>;
+	// if(isEOS(cursor, event, next_event)) goto set_eos else goto loop;
 	m.builder.SetInsertPointAtEnd(init)
 	prevSessionIdleTime := m.load(m.structgep(m.load(cursor_ref), cursorSessionIdleTimeElementIndex))
-	m.printf("idle? %d\n", m.constint(node.IdleDuration))
 	m.store(m.constint(node.IdleDuration), m.structgep(m.load(cursor_ref), cursorSessionIdleTimeElementIndex))
+	m.condbr(m.isEOS(cursor_ref, m.load(m.event_ref(cursor_ref), "event"), m.load(m.next_event_ref(cursor_ref), "next_event")), set_eos, loop)
+
+	// event->eos = 1;
+	// goto loop;
+	m.builder.SetInsertPointAtEnd(set_eos)
+	m.store(m.constint(1), m.structgep(m.load(m.event_ref(cursor_ref), "event"), eventEosElementIndex))
 	m.br(loop)
 
 	// ...generate...

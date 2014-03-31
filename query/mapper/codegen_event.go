@@ -162,12 +162,7 @@ func (m *Mapper) codegenCursorNextEventFunc() {
 	// max_timestamp = timestamp + session_idle_time;
 	// if(max_timestamp < next_timestamp) goto set_eos else goto exit;
 	m.builder.SetInsertPointAtEnd(check_eos)
-	timestamp := m.load(m.structgep(event, eventTimestampElementIndex))
-	nextTimestamp := m.load(m.structgep(next_event, eventTimestampElementIndex))
-	sessionIdleTime := m.load(m.structgep(m.load(cursor), cursorSessionIdleTimeElementIndex))
-	maxTimestamp := m.add(timestamp, sessionIdleTime, "max_timestamp")
-	m.printf("cmp: %d > 0 && %d < %d [%d]\n", sessionIdleTime, maxTimestamp, nextTimestamp, m.and(m.icmp(llvm.IntSGT, sessionIdleTime, m.constint(0)), m.icmp(llvm.IntSLE, maxTimestamp, nextTimestamp)))
-	m.condbr(m.and(m.icmp(llvm.IntSGT, sessionIdleTime, m.constint(0)), m.icmp(llvm.IntSLE, maxTimestamp, nextTimestamp)), set_eos, exit)
+	m.condbr(m.isEOS(cursor, event, next_event), set_eos, exit)
 
 	// event->eos = 1;
 	m.builder.SetInsertPointAtEnd(set_eos)

@@ -1,19 +1,30 @@
 {
-  "query": {
-    "first_location_country": {
-      "ca": {
-        "cart_count": 2,
-        "purchased_count": 1,
-        "reached_checkout_count": 1,
-        "total_sales": 2130,
-        "visited_count": 4
+  "events": {
+    "@timestamp": {
+      "1393004040": {
+        "count": 1
       },
-      "us": {
-        "cart_count": 2,
-        "purchased_count": 0,
-        "reached_checkout_count": 0,
-        "total_sales": 0,
-        "visited_count": 1
+      "1393090440": {
+        "count": 1
+      },
+      "1393090500": {
+        "count": 1
+      },
+      "1393112855": {
+        "count": 1
+      }
+    }
+  },
+  "sessions": {
+    "@timestamp": {
+      "1393004040": {
+        "count": 1
+      },
+      "1393090440": {
+        "count": 1
+      },
+      "1393112855": {
+        "count": 1
       }
     }
   }

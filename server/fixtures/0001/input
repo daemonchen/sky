@@ -8,12 +8,10 @@ POST /tables/tbl/properties {"name":"shipping","dataType":"integer","transient":
 POST /tables/tbl/properties {"name":"tax","dataType":"integer","transient":true}
 POST /tables/tbl/properties {"name":"tax_added","dataType":"integer","transient":true}
 
+# User0
+PATCH /tables/tbl/objects/user0/events/2014-02-21T17:34:00Z {"data":{"action":"visit","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
 
+PATCH /tables/tbl/objects/user0/events/2014-02-22T17:34:00Z {"data":{"action":"visit","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
+PATCH /tables/tbl/objects/user0/events/2014-02-22T17:35:00Z {"data":{"action":"cart","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
 
-# User 2 (three sessions)
-PATCH /tables/tbl/objects/user2/events/2014-02-21T17:34:00Z {"data":{"action":"visit","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
-
-PATCH /tables/tbl/objects/user2/events/2014-02-22T17:34:00Z {"data":{"action":"visit","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
-PATCH /tables/tbl/objects/user2/events/2014-02-22T17:35:00Z {"data":{"action":"cart","location_country":"ca","session_token":"B869712F-87AA-43FC-AD85"}}
-
-PATCH /tables/tbl/objects/user2/events/2014-02-22T23:47:35.261205Z {"data":{"action":"purchased","location_country":"","session_token":"B869712F-87AA-43FC-AD85","shipping":1000,"subtotal_price":2000,"tax":260,"tax_added":260}}
+PATCH /tables/tbl/objects/user0/events/2014-02-22T23:47:35.261205Z {"data":{"action":"purchased","location_country":"","session_token":"B869712F-87AA-43FC-AD85","shipping":1000,"subtotal_price":2000,"tax":260,"tax_added":260}}
