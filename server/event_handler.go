@@ -151,7 +151,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 				return
 			}
 			events = make(map[string][]*db.Event)
-			fmt.Println("[write]", time.Now().Since(t0))
+			fmt.Println("[write]", time.Since(t0))
 			mutex.Unlock()
 
 			if closed {
@@ -183,7 +183,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		count++
 		if count > int(flushThreshold) {
 			count = 0
-			fmt.Println("[read]", time.Now().Since(t0))
+			fmt.Println("[read]", time.Since(t0))
 			t0 := time.Now()
 			flush <- true
 		}
