@@ -765,6 +765,7 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 		return 0, fmt.Errorf("factorize txn error: %s", err)
 	} else if val != 0 {
 		stat.apply(&t.stat.Event.Factorize.FetchHit.Count, &t.stat.Event.Factorize.FetchHit.Duration)
+		t.caches[propertyID].add(value, val)
 		return val, nil
 	}
 	stat.apply(&t.stat.Event.Factorize.FetchMiss.Count, &t.stat.Event.Factorize.FetchMiss.Duration)
