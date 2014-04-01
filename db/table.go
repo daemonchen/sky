@@ -42,6 +42,7 @@ type Table struct {
 	propertiesByID map[int]*Property
 	env            *mdb.Env
 	caches         map[int]*cache
+	stat           Stat
 
 	shardCount     int
 	maxPermanentID int
@@ -428,12 +429,14 @@ func (t *Table) GetEvent(id string, timestamp time.Time) (*Event, error) {
 	if !t.opened() {
 		return nil, fmt.Errorf("table not open: %s", t.name)
 	}
+
 	rawEvent, err := t.getRawEvent(id, shiftTime(timestamp))
 	if err != nil {
 		return nil, err
 	} else if rawEvent == nil {
 		return nil, nil
 	}
+
 	return t.toEvent(rawEvent)
 }
 
@@ -468,6 +471,7 @@ func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
 		return nil, ErrObjectIDRequired
 	}
 
+	var stat = bench()
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, timestamp)
 	prefix := buf.Bytes()
@@ -484,12 +488,17 @@ func (t *Table) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
 	} else if b == nil {
 		return nil, nil
 	}
+	stat.count++
+	stat.apply(&t.stat.Event.Fetch.Count, &t.stat.Event.Fetch.Duration)
 
 	// Unmarshal bytes into a raw event.
+	stat = bench()
 	e := &rawEvent{}
 	if err := e.unmarshal(b); err != nil {
 		return nil, err
 	}
+	stat.count++
+	stat.apply(&t.stat.Event.Unmarshal.Count, &t.stat.Event.Unmarshal.Duration)
 
 	return e, nil
 }
@@ -500,6 +509,7 @@ func (t *Table) getRawEvents(id string) ([]*rawEvent, error) {
 	}
 
 	// Retrieve all bytes from the database.
+	var stat = bench()
 	var slices [][]byte
 	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
 		var err error
@@ -511,8 +521,11 @@ func (t *Table) getRawEvents(id string) ([]*rawEvent, error) {
 	} else if slices == nil {
 		return nil, nil
 	}
+	stat.count += len(slices)
+	stat.apply(&t.stat.Event.Fetch.Count, &t.stat.Event.Fetch.Duration)
 
 	// Unmarshal each slice into a raw event.
+	stat = bench()
 	var events []*rawEvent
 	for _, b := range slices {
 		e := &rawEvent{}
@@ -521,6 +534,8 @@ func (t *Table) getRawEvents(id string) ([]*rawEvent, error) {
 		}
 		events = append(events, e)
 	}
+	stat.count += len(events)
+	stat.apply(&t.stat.Event.Unmarshal.Count, &t.stat.Event.Unmarshal.Duration)
 	return events, nil
 }
 
@@ -587,12 +602,16 @@ func (t *Table) insertEvent(id string, e *Event) error {
 	}
 
 	// Marshal raw event into byte slice.
+	var stat = bench()
 	b, err := rawEvent.marshal()
 	if err != nil {
 		return err
 	}
+	stat.count++
+	stat.apply(&t.stat.Event.Marshal.Count, &t.stat.Event.Marshal.Duration)
 
 	// Create the timestamp prefix.
+	stat = bench()
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, rawEvent.timestamp)
 	prefix := buf.Bytes()
@@ -607,6 +626,8 @@ func (t *Table) insertEvent(id string, e *Event) error {
 	if err != nil {
 		return fmt.Errorf("insert event txn error: %s", err)
 	}
+	stat.count++
+	stat.apply(&t.stat.Event.Insert.Count, &t.stat.Event.Insert.Duration)
 	return nil
 }
 
@@ -619,6 +640,7 @@ func (t *Table) DeleteEvent(id string, timestamp time.Time) error {
 	}
 
 	// Create the timestamp prefix.
+	var stat = bench()
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, shiftTime(timestamp))
 	prefix := buf.Bytes()
@@ -630,6 +652,8 @@ func (t *Table) DeleteEvent(id string, timestamp time.Time) error {
 	if err != nil {
 		return fmt.Errorf("delete event txn error: %s", err)
 	}
+	stat.count++
+	stat.apply(&t.stat.Event.Delete.Count, &t.stat.Event.Delete.Duration)
 	return err
 }
 
@@ -720,10 +744,13 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 
 	// Check the LRU first.
 	if sequence, ok := t.caches[propertyID].getValue(value); ok {
+		t.stat.Event.Factorize.CacheHit.Count++
 		return sequence, nil
 	}
 
 	// Find an existing factor for the value.
+	var stat = bench()
+	stat.count++
 	var val int
 	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
 		data, err := txn.get(factorDBName(propertyID), factorKey(value))
@@ -737,8 +764,10 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 	if err != nil {
 		return 0, fmt.Errorf("factorize txn error: %s", err)
 	} else if val != 0 {
+		stat.apply(&t.stat.Event.Factorize.FetchHit.Count, &t.stat.Event.Factorize.FetchHit.Duration)
 		return val, nil
 	}
+	stat.apply(&t.stat.Event.Factorize.FetchMiss.Count, &t.stat.Event.Factorize.FetchMiss.Duration)
 
 	// Create a new factor if requested.
 	if createIfNotExists {
@@ -750,6 +779,7 @@ func (t *Table) factorize(propertyID int, value string, createIfNotExists bool) 
 
 func (t *Table) addFactor(propertyID int, value string) (int, error) {
 	var index int
+	var stat = bench()
 	err := t.txn(0, func(txn *transaction) error {
 		// Look up next sequence index.
 		data, err := txn.get(factorDBName(propertyID), []byte("+"))
@@ -791,6 +821,9 @@ func (t *Table) addFactor(propertyID int, value string) (int, error) {
 	// Add to cache.
 	t.caches[propertyID].add(value, index)
 
+	stat.count++
+	stat.apply(&t.stat.Event.Factorize.Create.Count, &t.stat.Event.Factorize.Create.Duration)
+
 	return index, nil
 }
 
@@ -810,9 +843,12 @@ func (t *Table) defactorize(propertyID int, index int) (string, error) {
 
 	// Check the cache first.
 	if key, ok := t.caches[propertyID].getKey(index); ok {
+		t.stat.Event.Defactorize.CacheHit.Count++
 		return key, nil
 	}
 
+	var stat = bench()
+	stat.count++
 	var data []byte
 	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
 		var err error
@@ -822,8 +858,10 @@ func (t *Table) defactorize(propertyID int, index int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("defactorize error: %s", err)
 	} else if data == nil {
+		stat.apply(&t.stat.Event.Defactorize.FetchMiss.Count, &t.stat.Event.Defactorize.FetchMiss.Duration)
 		return "", fmt.Errorf("factor not found: %d: %d", propertyID, index)
 	}
+	stat.apply(&t.stat.Event.Defactorize.FetchHit.Count, &t.stat.Event.Defactorize.FetchHit.Duration)
 
 	// Add to cache.
 	t.caches[propertyID].add(string(data), index)
@@ -875,11 +913,11 @@ func (t *Table) Stat() (*Stat, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Stat{
-		Entries: stat.Entries,
-		Size:    info.MapSize,
-		Depth:   stat.Depth,
-	}
+	s := &Stat{}
+	*s = t.stat
+	s.Entries = stat.Entries
+	s.Size = info.MapSize
+	s.Depth = stat.Depth
 	s.Transactions.Last = info.LastTxnID
 	s.Readers.Max = info.MaxReaders
 	s.Readers.Current = info.NumReaders
@@ -1066,6 +1104,28 @@ func (e *rawEvent) normalize() {
 	}
 }
 
+// stat represents a simple counter and timer.
+type stat struct {
+	count int
+	time  time.Time
+}
+
+// since returns the elapsed time since the stat began.
+func (s *stat) since() time.Duration {
+	return time.Since(s.time)
+}
+
+// apply increments the count and duration based on the stat.
+func (s *stat) apply(count *int, duration *time.Duration) {
+	*count += s.count
+	*duration += time.Since(s.time)
+}
+
+// bench begins a timed stat counter.
+func bench() stat {
+	return stat{0, time.Now()}
+}
+
 // Stat represents statistics for a single table.
 type Stat struct {
 	Entries      uint64 `json:"entries"` // Number of data items
@@ -1085,6 +1145,101 @@ type Stat struct {
 		Leaf     uint64 `json:"leaf"`     // Number of leaf pages
 		Overflow uint64 `json:"overflow"` // Number of overflow pages
 	} `json:"pages"`
+	Event struct {
+		Fetch struct {
+			Count    int           `json:"count"`
+			Duration time.Duration `json:"duration"`
+		} `json:"fetch"`
+		Insert struct {
+			Count    int           `json:"count"`
+			Duration time.Duration `json:"duration"`
+		} `json:"insert"`
+		Delete struct {
+			Count    int           `json:"count"`
+			Duration time.Duration `json:"duration"`
+		} `json:"delete"`
+		Factorize struct {
+			CacheHit struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"cacheHit"`
+			FetchHit struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"fetchHit"`
+			FetchMiss struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"fetchMiss"`
+			Create struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"create"`
+		} `json:"factorize"`
+		Defactorize struct {
+			CacheHit struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"cacheHit"`
+			FetchHit struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"fetchHit"`
+			FetchMiss struct {
+				Count    int           `json:"count"`
+				Duration time.Duration `json:"duration"`
+			} `json:"fetchMiss"`
+		} `json:"defactorize"`
+		Marshal struct {
+			Count    int           `json:"count"`
+			Duration time.Duration `json:"duration"`
+		} `json:"marshal"`
+		Unmarshal struct {
+			Count    int           `json:"count"`
+			Duration time.Duration `json:"duration"`
+		} `json:"unmarshal"`
+	} `json:"event"`
+}
+
+// Diff calculates the difference between a stat object and another.
+func (s *Stat) Diff(other *Stat) *Stat {
+	diff := &Stat{}
+	diff.Entries = s.Entries - other.Entries
+	diff.Size = s.Size - other.Size
+	diff.Depth = s.Depth - other.Depth
+	diff.Transactions.Last = s.Transactions.Last - other.Transactions.Last
+	diff.Readers.Max = s.Readers.Max - other.Readers.Max
+	diff.Readers.Current = s.Readers.Current - other.Readers.Current
+	diff.Pages.Last = s.Pages.Last - other.Pages.Last
+	diff.Pages.Size = s.Pages.Size - other.Pages.Size
+	diff.Pages.Branch = s.Pages.Branch - other.Pages.Branch
+	diff.Pages.Leaf = s.Pages.Leaf - other.Pages.Leaf
+	diff.Pages.Overflow = s.Pages.Overflow - other.Pages.Overflow
+	diff.Event.Fetch.Count = s.Event.Fetch.Count - other.Event.Fetch.Count
+	diff.Event.Fetch.Duration = s.Event.Fetch.Duration - other.Event.Fetch.Duration
+	diff.Event.Insert.Count = s.Event.Insert.Count - other.Event.Insert.Count
+	diff.Event.Insert.Duration = s.Event.Insert.Duration - other.Event.Insert.Duration
+	diff.Event.Delete.Count = s.Event.Delete.Count - other.Event.Delete.Count
+	diff.Event.Delete.Duration = s.Event.Delete.Duration - other.Event.Delete.Duration
+	diff.Event.Factorize.CacheHit.Count = s.Event.Factorize.CacheHit.Count - other.Event.Factorize.CacheHit.Count
+	diff.Event.Factorize.CacheHit.Duration = s.Event.Factorize.CacheHit.Duration - other.Event.Factorize.CacheHit.Duration
+	diff.Event.Factorize.FetchHit.Count = s.Event.Factorize.FetchHit.Count - other.Event.Factorize.FetchHit.Count
+	diff.Event.Factorize.FetchHit.Duration = s.Event.Factorize.FetchHit.Duration - other.Event.Factorize.FetchHit.Duration
+	diff.Event.Factorize.FetchMiss.Count = s.Event.Factorize.FetchMiss.Count - other.Event.Factorize.FetchMiss.Count
+	diff.Event.Factorize.FetchMiss.Duration = s.Event.Factorize.FetchMiss.Duration - other.Event.Factorize.FetchMiss.Duration
+	diff.Event.Factorize.Create.Count = s.Event.Factorize.Create.Count - other.Event.Factorize.Create.Count
+	diff.Event.Factorize.Create.Duration = s.Event.Factorize.Create.Duration - other.Event.Factorize.Create.Duration
+	diff.Event.Defactorize.CacheHit.Count = s.Event.Defactorize.CacheHit.Count - other.Event.Defactorize.CacheHit.Count
+	diff.Event.Defactorize.CacheHit.Duration = s.Event.Defactorize.CacheHit.Duration - other.Event.Defactorize.CacheHit.Duration
+	diff.Event.Defactorize.FetchHit.Count = s.Event.Defactorize.FetchHit.Count - other.Event.Defactorize.FetchHit.Count
+	diff.Event.Defactorize.FetchHit.Duration = s.Event.Defactorize.FetchHit.Duration - other.Event.Defactorize.FetchHit.Duration
+	diff.Event.Defactorize.FetchMiss.Count = s.Event.Defactorize.FetchMiss.Count - other.Event.Defactorize.FetchMiss.Count
+	diff.Event.Defactorize.FetchMiss.Duration = s.Event.Defactorize.FetchMiss.Duration - other.Event.Defactorize.FetchMiss.Duration
+	diff.Event.Marshal.Count = s.Event.Marshal.Count - other.Event.Marshal.Count
+	diff.Event.Marshal.Duration = s.Event.Marshal.Duration - other.Event.Marshal.Duration
+	diff.Event.Unmarshal.Count = s.Event.Unmarshal.Count - other.Event.Unmarshal.Count
+	diff.Event.Unmarshal.Duration = s.Event.Unmarshal.Duration - other.Event.Unmarshal.Duration
+	return diff
 }
 
 type Cursor struct {

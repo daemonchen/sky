@@ -184,7 +184,7 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		if count > int(flushThreshold) {
 			count = 0
 			fmt.Println("[read]", time.Since(t0))
-			t0 := time.Now()
+			t0 = time.Now()
 			flush <- true
 		}
 		mutex.Unlock()

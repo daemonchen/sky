@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"io/ioutil"
+	"time"
 )
 
 // tableHandler handles the management of tables in the database.
@@ -16,6 +18,7 @@ func installTableHandler(s *Server) *tableHandler {
 	s.HandleFunc("/tables/{table}", EnsureTableHandler(HandleFunc(h.deleteTable))).Methods("DELETE")
 	s.HandleFunc("/tables/{table}/keys", EnsureTableHandler(HandleFunc(h.getKeys))).Methods("GET")
 	s.HandleFunc("/tables/{table}/stats", EnsureTableHandler(HandleFunc(h.stats))).Methods("GET")
+	s.HandleFunc("/tables/{table}/stats/sample", EnsureTableHandler(HandleFunc(h.statsSample))).Methods("GET")
 	return h
 }
 
@@ -65,9 +68,38 @@ func (h *tableHandler) getKeys(s *Server, req Request) (interface{}, error) {
 	return req.Table().Keys()
 }
 
-// stats returns LMDB stats for a given table.
+// stats returns stats for a given table.
 func (h *tableHandler) stats(s *Server, req Request) (interface{}, error) {
 	return req.Table().Stat()
+}
+
+// statsSample returns stats for a given table for a given duration.
+func (h *tableHandler) statsSample(s *Server, req Request) (interface{}, error) {
+	var duration = 1 * time.Second
+	if str := req.Var("duration"); str != "" {
+		var err error
+		if duration, err = time.ParseDuration(str); err != nil {
+			return nil, fmt.Errorf("invalid duration: %s", str)
+		}
+	}
+
+	// Retrieve initial stats.
+	t := req.Table()
+	stat1, err := t.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat: %s", err)
+	}
+
+	// Wait for the given duration.
+	time.Sleep(duration)
+
+	// Retrieve new stats.
+	stat2, err := t.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat: %s", err)
+	}
+
+	return stat2.Diff(stat1), nil
 }
 
 type tableMessage struct {
