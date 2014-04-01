@@ -1160,8 +1160,7 @@ type Stat struct {
 		} `json:"delete"`
 		Factorize struct {
 			CacheHit struct {
-				Count    int           `json:"count"`
-				Duration time.Duration `json:"duration"`
+				Count int `json:"count"`
 			} `json:"cacheHit"`
 			FetchHit struct {
 				Count    int           `json:"count"`
@@ -1178,8 +1177,7 @@ type Stat struct {
 		} `json:"factorize"`
 		Defactorize struct {
 			CacheHit struct {
-				Count    int           `json:"count"`
-				Duration time.Duration `json:"duration"`
+				Count int `json:"count"`
 			} `json:"cacheHit"`
 			FetchHit struct {
 				Count    int           `json:"count"`
