@@ -141,7 +141,6 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 
 			// Flush events.
 			mutex.Lock()
-			t0 := time.Now()
 			if err := t.InsertObjects(events); err != nil {
 				log.Printf("flush: %s", err)
 
@@ -161,7 +160,6 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 
 	// Stream in JSON event objects.
 	var decoder = json.NewDecoder(req.Body)
-	t0 := time.Now()
 	for {
 		// Read in a JSON object.
 		var message = new(eventMessage)
@@ -183,7 +181,6 @@ func (h *eventHandler) insertEventStream(w http.ResponseWriter, req *http.Reques
 		if count > int(flushThreshold) {
 			count = 0
 			flush <- true
-			t0 = time.Now()
 		}
 		mutex.Unlock()
 	}
