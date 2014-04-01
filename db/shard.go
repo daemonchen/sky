@@ -69,7 +69,7 @@ func (s *shard) Stat() (*Stat, error) {
 	ss.Pages.Size = stat.PSize
 	ss.Pages.Branch = stat.BranchPages
 	ss.Pages.Leaf = stat.LeafPages
-	ss.Pages.Overflow = stat.OwerflowPages
+	ss.Pages.Overflow = stat.OverflowPages
 	return ss, nil
 }
 
