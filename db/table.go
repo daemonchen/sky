@@ -1220,7 +1220,6 @@ func (s *Stat) Diff(other *Stat) *Stat {
 	diff.Event.Delete.Count = s.Event.Delete.Count - other.Event.Delete.Count
 	diff.Event.Delete.Duration = s.Event.Delete.Duration - other.Event.Delete.Duration
 	diff.Event.Factorize.CacheHit.Count = s.Event.Factorize.CacheHit.Count - other.Event.Factorize.CacheHit.Count
-	diff.Event.Factorize.CacheHit.Duration = s.Event.Factorize.CacheHit.Duration - other.Event.Factorize.CacheHit.Duration
 	diff.Event.Factorize.FetchHit.Count = s.Event.Factorize.FetchHit.Count - other.Event.Factorize.FetchHit.Count
 	diff.Event.Factorize.FetchHit.Duration = s.Event.Factorize.FetchHit.Duration - other.Event.Factorize.FetchHit.Duration
 	diff.Event.Factorize.FetchMiss.Count = s.Event.Factorize.FetchMiss.Count - other.Event.Factorize.FetchMiss.Count
@@ -1228,7 +1227,6 @@ func (s *Stat) Diff(other *Stat) *Stat {
 	diff.Event.Factorize.Create.Count = s.Event.Factorize.Create.Count - other.Event.Factorize.Create.Count
 	diff.Event.Factorize.Create.Duration = s.Event.Factorize.Create.Duration - other.Event.Factorize.Create.Duration
 	diff.Event.Defactorize.CacheHit.Count = s.Event.Defactorize.CacheHit.Count - other.Event.Defactorize.CacheHit.Count
-	diff.Event.Defactorize.CacheHit.Duration = s.Event.Defactorize.CacheHit.Duration - other.Event.Defactorize.CacheHit.Duration
 	diff.Event.Defactorize.FetchHit.Count = s.Event.Defactorize.FetchHit.Count - other.Event.Defactorize.FetchHit.Count
 	diff.Event.Defactorize.FetchHit.Duration = s.Event.Defactorize.FetchHit.Duration - other.Event.Defactorize.FetchHit.Duration
 	diff.Event.Defactorize.FetchMiss.Count = s.Event.Defactorize.FetchMiss.Count - other.Event.Defactorize.FetchMiss.Count
