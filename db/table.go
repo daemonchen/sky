@@ -926,7 +926,7 @@ func (t *Table) Stat() (*Stat, error) {
 	s.Pages.Size = stat.PSize
 	s.Pages.Branch = stat.BranchPages
 	s.Pages.Leaf = stat.LeafPages
-	s.Pages.Overflow = stat.OwerflowPages
+	s.Pages.Overflow = stat.OverflowPages
 	return s, nil
 }
 
