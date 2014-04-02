@@ -231,7 +231,9 @@ func (f *Factorizer) factorize(id string, value string, createIfMissing bool) (u
 	if err != nil {
 		return 0, err
 	} else if data != nil {
-		return binary.BigEndian.Uint64(data), nil
+		sequence := binary.BigEndian.Uint64(data)
+		c.add(value, sequence)
+		return sequence, nil
 	}
 
 	// Create a new factor if requested.
