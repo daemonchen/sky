@@ -4,16 +4,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"runtime"
 	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/skydb/sky/db"
 )
-
-// The number of servlets created on startup defaults to the number
-// of logical cores on a machine.
-var defaultServletCount = runtime.NumCPU()
 
 // Server is the HTTP transport used to connect to the databsae.
 type Server struct {

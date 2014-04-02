@@ -84,6 +84,7 @@ func (t *Table) create() error {
 	}
 
 	// Set initial shard count.
+	t.shardCount = 16
 	if t.shardCount == 0 {
 		t.shardCount = runtime.NumCPU()
 	}

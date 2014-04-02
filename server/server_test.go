@@ -17,10 +17,6 @@ import (
 const testPort = 8586
 
 func init() {
-	// Standardize servlet count for tests so we don't get different
-	// results on different machines.
-	defaultServletCount = 16
-
 	// Turn off logging.
 	log.SetOutput(ioutil.Discard)
 }

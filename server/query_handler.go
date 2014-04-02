@@ -11,7 +11,6 @@ import (
 	"github.com/skydb/sky/query/mapper"
 	"github.com/skydb/sky/query/parser"
 	"github.com/skydb/sky/query/reducer"
-	//"github.com/szferi/gomdb"
 )
 
 // queryHandler handles the execute of queries against database tables.
@@ -105,16 +104,16 @@ func (h *queryHandler) execute(s *Server, req Request, querystring string) (inte
 	results := make(chan interface{}, t.ShardCount())
 	t.ForEach(func(cursor *db.Cursor) {
 		wg.Add(1)
-		//go func(cursor *mdb.Cursor) {
-		defer cursor.Close()
-		result := query.NewHashmap()
-		if err := m.Map(cursor, prefix, result); err == nil {
-			results <- result
-		} else {
-			results <- err
-		}
-		wg.Done()
-		//}(cursor)
+		go func(cursor *db.Cursor) {
+			defer cursor.Close()
+			result := query.NewHashmap()
+			if err := m.Map(cursor, prefix, result); err == nil {
+				results <- result
+			} else {
+				results <- err
+			}
+			wg.Done()
+		}(cursor)
 	})
 
 	// Don't exit function until all mappers finish.

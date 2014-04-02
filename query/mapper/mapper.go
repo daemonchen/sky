@@ -1,6 +1,15 @@
 package mapper
 
-// #include <stdlib.h>
+/*
+#include <stdlib.h>
+
+typedef void entry_t(void*, void*);
+
+void run_mapper(void *fn, void *cursor, void *result) {
+	((entry_t*)fn)(cursor, result);
+}
+
+*/
 import "C"
 
 import (
@@ -41,7 +50,7 @@ type Mapper struct {
 	mdbCursorType llvm.Type
 	mdbValType    llvm.Type
 
-	entryFunc llvm.Value
+	entryFunc unsafe.Pointer
 }
 
 // New creates a new Mapper instance.
@@ -63,7 +72,7 @@ func New(q *ast.Query, t *db.Table) (*Mapper, error) {
 	}
 	m.decls = q.VarDecls()
 
-	if m.entryFunc, err = m.codegenQuery(q); err != nil {
+	if _, err = m.codegenQuery(q); err != nil {
 		return nil, err
 	}
 	if err = llvm.VerifyModule(m.module, llvm.ReturnStatusAction); err != nil {
@@ -85,6 +94,9 @@ func New(q *ast.Query, t *db.Table) (*Mapper, error) {
 	pass.AddCFGSimplificationPass()
 	pass.Run(m.module)
 
+	// Extract pointer to the function.
+	m.entryFunc = m.engine.PointerToGlobal(m.engine.FindFunction("entry"))
+
 	return m, nil
 }
 
@@ -102,10 +114,8 @@ func (m *Mapper) Map(c *db.Cursor, prefix string, result *query.Hashmap) error {
 	cursor := sky_cursor_new(c.Cursor, prefix)
 	defer sky_cursor_free(cursor)
 
-	m.engine.RunFunction(m.entryFunc, []llvm.GenericValue{
-		llvm.NewGenericValueFromPointer(unsafe.Pointer(cursor)),
-		llvm.NewGenericValueFromPointer(unsafe.Pointer(result.C)),
-	})
+	C.run_mapper(m.entryFunc, unsafe.Pointer(cursor), unsafe.Pointer(result.C))
+
 	return nil
 }
 
@@ -116,5 +126,10 @@ func (m *Mapper) Iterate(c *db.Cursor) {
 
 // Dump writes the LLVM IR to STDERR.
 func (m *Mapper) Dump() {
+	m.module.Dump()
+}
+
+// Copy creates a clone of this mapper.
+func (m *Mapper) Copy() {
 	m.module.Dump()
 }
