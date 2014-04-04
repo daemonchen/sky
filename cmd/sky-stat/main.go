@@ -126,8 +126,6 @@ func printShardStats(txn *mdb.Txn, index int) error {
 	}
 	defer c.Close()
 
-	fmt.Printf("# SHARD %d ##############################\n", index)
-
 	// Loop over every object.
 	var size, propertyCount, objectCount, eventCount int
 	for k, _, err := c.Get(nil, mdb.NEXT_NODUP); err != mdb.NotFound; k, _, err = c.Get(nil, mdb.NEXT_NODUP) {
@@ -161,6 +159,11 @@ func printShardStats(txn *mdb.Txn, index int) error {
 		}
 	}
 
+	fmt.Printf("# SHARD %d ##############################\n", index)
+	if objectCount == 0 || eventCount == 0 {
+		fmt.Println("[empty]")
+		return nil
+	}
 	fmt.Println("Total Size:", size)
 	fmt.Println("Object Count:", objectCount)
 	fmt.Println("Event Count:", eventCount)
@@ -194,6 +197,11 @@ func printPropertyStats(txn *mdb.Txn, p *db.Property) error {
 	}
 
 	fmt.Printf("# FACTOR: %s ##############################\n", p.Name)
+	if count == 0 {
+		fmt.Println("[empty]")
+		return nil
+	}
+
 	fmt.Println("Total Size:", keySize+valueSize)
 	fmt.Println("Count:", count)
 	fmt.Println("Avg Bytes per Key:", keySize/count)
