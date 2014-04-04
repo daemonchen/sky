@@ -15,7 +15,7 @@ import (
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: sky-stat PATH\n")
+		fmt.Fprintf(os.Stderr, "usage: sky-stat PATH (shards | factors)\n")
 		os.Exit(1)
 	}
 }
@@ -23,8 +23,8 @@ func init() {
 func main() {
 	log.SetFlags(0)
 	flag.Parse()
-	path := flag.Arg(0)
-	if path == "" {
+	path, command := flag.Arg(0), flag.Arg(1)
+	if path == "" || command == "" {
 		flag.Usage()
 	}
 
@@ -57,21 +57,24 @@ func main() {
 	fmt.Println("")
 
 	// Show shard stats.
-	for i := 0; i < meta.ShardCount; i++ {
-		if err := printShardStats(txn, i); err != nil {
-			log.Fatalf("shard %d: %v", i, err)
-		}
-	}
-
-	// Show property stats.
-	for _, p := range meta.Properties {
-		if p.DataType == db.Factor {
-			if err := printPropertyStats(txn, p); err != nil {
-				log.Fatalf("property[%d/%s]: %v", p.ID, p.Name, err)
+	if command == "shards" {
+		for i := 0; i < meta.ShardCount; i++ {
+			if err := printShardStats(txn, i); err != nil {
+				log.Fatalf("shard %d: %v", i, err)
 			}
 		}
 	}
 
+	// Show property stats.
+	if command == "factors" {
+		for _, p := range meta.Properties {
+			if p.DataType == db.Factor {
+				if err := printPropertyStats(txn, p); err != nil {
+					log.Fatalf("property[%d/%s]: %v", p.ID, p.Name, err)
+				}
+			}
+		}
+	}
 }
 
 func openEnv(path string) (*mdb.Env, error) {
