@@ -8,9 +8,7 @@ TEST=.
 PKG=./...
 GO=/usr/local/go/bin/go
 
-REPO_OWNER=github.com/skydb
-APP_NAME=sky
-APP_REPO=$(REPO_OWNER)/$(APP_NAME)
+REPO=github.com/skydb/sky
 CWD=$(shell pwd)
 ifndef GOPATH 
 GOPATH=`pwd`/.go
@@ -34,8 +32,8 @@ env:
 	@echo "CGO_CFLAGS=$(CFLAGS) CGO_LDFLAGS=$(LDFLAGS)"
 	@echo "GOPATH=$(GOPATH) GOBIN=$(GOBIN)"
 	mkdir -p $(GOBIN)
-	mkdir -p $(GOPATH)/src/$(REPO_OWNER)
-	[ -d $(GOPATH)/src/$(APP_REPO) ] || ln -sfv $(CWD) $(GOPATH)/src/$(APP_REPO)
+	mkdir -p $(GOPATH)/src/`dirname $(REPO)`
+	[ -d $(GOPATH)/src/$(REPO) ] || ln -sfv $(CWD) $(GOPATH)/src/$(REPO)
 
 fmt:
 	go fmt ./...
