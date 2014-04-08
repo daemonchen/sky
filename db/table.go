@@ -620,7 +620,7 @@ func (t *Table) insertEvent(id string, e *Event) error {
 	// Insert event into appropriate shard.
 	err = t.txn(0, func(txn *transaction) error {
 		if err := txn.putAt(shardDBName(t.shardIndex(id)), []byte(id), prefix, b); err != nil {
-			return fmt.Errorf("insert event put error: %s", err)
+			return fmt.Errorf("insert event put error on id=%s and prefix=%s with event=%+v: %s", id, prefix, rawEvent, err)
 		}
 		return nil
 	})
