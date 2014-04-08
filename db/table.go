@@ -592,6 +592,9 @@ func (t *Table) insertEvent(id string, e *Event) error {
 		return fmt.Errorf("insert event error: %s", err)
 	}
 
+	// Truncate the id so it fits in our max key size.
+	id = truncateFactor(id)
+
 	// Retrieve existing event for object at the same moment and merge.
 	current, err := t.getRawEvent(id, rawEvent.timestamp)
 	if current != nil {
@@ -903,6 +906,15 @@ func truncateFactor(value string) string {
 		return value[0:maxKeySize]
 	}
 	return value
+}
+
+// truncateId returns the value that can be saved because of LMDB size
+// restrictions.
+func truncateId(id string) string {
+	if len(id) > maxKeySize {
+		return id[0:maxKeySize]
+	}
+	return id
 }
 
 // Stat returns statistics for the table's underlying LMDB environment.

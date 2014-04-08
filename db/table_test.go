@@ -619,6 +619,20 @@ func TestTableFactorTruncate(t *testing.T) {
 	})
 }
 
+// Ensure that a table will truncate id to account for LMDB limitations.
+func TestTableIdTruncate(t *testing.T) {
+	withDB(func(db *DB, path string) {
+		table, _ := db.CreateTable("foo", 0)
+		table.CreateProperty("prop1", Factor, false)
+		table.InsertEvent(strings.Repeat("A", 600), newEvent("2000-01-01T00:00:00Z", "prop1", "value1"))
+
+		// Verify the truncation.
+		e, err := table.GetEvent(strings.Repeat("A", 500), mustParseTime("2000-01-01T00:00:00Z"))
+		assert.NoError(t, err)
+		assert.Equal(t, e.Data["prop1"], "value1")
+	})
+}
+
 func newEvent(timestamp string, pairs ...interface{}) *Event {
 	e := &Event{Timestamp: mustParseTime(timestamp), Data: make(map[string]interface{})}
 	for i := 0; i < len(pairs); i += 2 {
