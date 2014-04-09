@@ -150,7 +150,7 @@ func (t *transaction) putAt(name string, key, prefix, value []byte) error {
 	}
 
 	if err := t.Put(dbi, []byte(key), value, mdb.NODUPDATA); err != nil {
-		return fmt.Errorf("txn error: %s", err)
+		return fmt.Errorf("txn error on %s with %s=%s, prefix=%s: %s", name, key, string(value), prefix, err)
 	}
 	return nil
 }
