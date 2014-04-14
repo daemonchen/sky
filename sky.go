@@ -1,4 +1,4 @@
-package hash
+package sky
 
 import (
 	"hash/fnv"

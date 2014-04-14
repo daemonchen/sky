@@ -1,8 +1,9 @@
-package hash
+package sky_test
 
 import (
 	"testing"
 
+	. "github.com/skydb/sky"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,6 +1,0 @@
-FOR EACH SESSION DELIMITED BY 30 MINUTES
-  SELECT count() GROUP BY @@timestamp INTO "sessions"
-  FOR EACH EVENT
-    SELECT count() GROUP BY @@timestamp INTO "events"
-  END
-END
