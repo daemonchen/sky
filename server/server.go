@@ -18,9 +18,6 @@ type Server struct {
 	db                   *db.DB
 	path                 string
 	listener             net.Listener
-	NoSync               bool
-	MaxDBs               uint
-	MaxReaders           uint
 	StreamFlushPeriod    uint
 	StreamFlushThreshold uint
 	Version              string
@@ -32,9 +29,6 @@ func NewServer(port uint, path string) *Server {
 		Server:               &http.Server{Addr: fmt.Sprintf(":%d", port)},
 		Router:               mux.NewRouter(),
 		path:                 path,
-		NoSync:               false,
-		MaxDBs:               4096,
-		MaxReaders:           126,
 		StreamFlushPeriod:    60, // seconds
 		StreamFlushThreshold: 1000,
 	}
@@ -61,11 +55,7 @@ func (s *Server) ListenAndServe() error {
 	defer s.Close()
 
 	// Initialize and open database.
-	s.db = &db.DB{
-		NoSync:     s.NoSync,
-		MaxDBs:     s.MaxDBs,
-		MaxReaders: s.MaxReaders,
-	}
+	s.db = &db.DB{}
 	if err := s.db.Open(s.path); err != nil {
 		return err
 	}

@@ -23,18 +23,12 @@ const (
 	// DefaultNoSync is the default setting for syncing the data.
 	DefaultNoSync = false
 
-	// DefaultMaxDBs is the default LMDB setting for MaxDBs.
-	DefaultMaxDBs = 4096
-
-	// DefaultMaxReaders is the default LMDB setting for MaxReaders.
-	DefaultMaxReaders = 126 // lmdb's default
-
 	// DefaultStreamFlushPeriod is the default length of time between flushing
-	// events from the bulk endpoint into LMDB.
+	// events from the bulk endpoint into the database.
 	DefaultStreamFlushPeriod = 60 // seconds
 
 	// DefaultStreamFlushThreshold is the default max number of events to stream
-	// in before flushing from the bulk endpoint into LMDB.
+	// in before flushing from the bulk endpoint into the database.
 	DefaultStreamFlushThreshold = 1000
 )
 
@@ -50,9 +44,6 @@ func init() {
 	flag.UintVar(&config.Port, "port", config.Port, "the port to listen on")
 	flag.UintVar(&config.Port, "p", config.Port, "the port to listen on")
 	flag.StringVar(&config.DataDir, "data-dir", config.DataDir, "the data directory (defaults to ~/.sky)")
-	flag.BoolVar(&config.NoSync, "no-sync", config.NoSync, "use mdb.NOSYNC option, or not")
-	flag.UintVar(&config.MaxDBs, "max-dbs", config.MaxDBs, "max number of named btrees in the database (mdb.MaxDBs)")
-	flag.UintVar(&config.MaxReaders, "max-readers", config.MaxReaders, "max number of concurrenly executing queries (mdb.MaxReaders)")
 	flag.UintVar(&config.StreamFlushPeriod, "stream-flush-period", config.StreamFlushPeriod, "time period on which to flush streamed events")
 	flag.UintVar(&config.StreamFlushThreshold, "stream-flush-threshold", config.StreamFlushThreshold, "the maximum number of events (per table) in event stream before flush")
 	flag.StringVar(&configPath, "config", "", "the path to the config file")
@@ -94,9 +85,6 @@ func main() {
 	// Initialize
 	s := server.NewServer(config.Port, config.DataDir)
 	s.Version = cmd.Version()
-	s.NoSync = config.NoSync
-	s.MaxDBs = config.MaxDBs
-	s.MaxReaders = config.MaxReaders
 	s.StreamFlushPeriod = config.StreamFlushPeriod
 	s.StreamFlushThreshold = config.StreamFlushThreshold
 
@@ -107,9 +95,6 @@ func main() {
 	log.Println("[config]")
 	log.Printf("port         = %v", config.Port)
 	log.Printf("data-dir     = %v", config.DataDir)
-	log.Printf("no-sync      = %v", s.NoSync)
-	log.Printf("max-dbs      = %v", s.MaxDBs)
-	log.Printf("max-readers  = %v", s.MaxReaders)
 	log.Printf("flush-period = %v", s.StreamFlushPeriod)
 	log.Printf("flush-thresh = %v", s.StreamFlushThreshold)
 	log.Println("")

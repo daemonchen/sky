@@ -12,14 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/skydb/sky/hash"
-	"github.com/szferi/gomdb"
 	"github.com/ugorji/go/codec"
 )
-
-// maxKeySize is the size, in bytes, of the largest key that can be inserted.
-// This is a limitation of LMDB.
-const maxKeySize = 500
 
 // FactorCacheSize is the number of factors that are stored in the LRU cache.
 // This cache size is per-property.
@@ -33,24 +29,17 @@ var (
 
 // Table represents a collection of objects.
 type Table struct {
-	sync.RWMutex
+	sync.Mutex
 
-	db             *DB
-	name           string
-	path           string
-	properties     map[string]*Property
-	propertiesByID map[int]*Property
-	env            *mdb.Env
-	caches         map[int]*cache
-	stat           Stat
+	db     *bolt.DB
+	name   string
+	path   string
+	caches map[int]*cache
+	stat   Stat
 
 	shardCount     int
 	maxPermanentID int
 	maxTransientID int
-
-	noSync     bool
-	maxDBs     uint
-	maxReaders uint
 }
 
 // Name returns the name of the table.
@@ -74,7 +63,7 @@ func (t *Table) Exists() bool {
 	return !os.IsNotExist(err)
 }
 
-func (t *Table) create() error {
+func (t *Table) Create() error {
 	t.Lock()
 	defer t.Unlock()
 
@@ -90,7 +79,7 @@ func (t *Table) create() error {
 	}
 
 	// Open the table.
-	if err := t._open(); err != nil {
+	if err := t.open(); err != nil {
 		return err
 	}
 
@@ -102,15 +91,15 @@ func (t *Table) create() error {
 	return nil
 }
 
-// open opens and initializes the table.
-func (t *Table) open() error {
+// Open opens and initializes the table.
+func (t *Table) Open() error {
 	t.Lock()
 	defer t.Unlock()
-	return t._open()
+	return t.open()
 }
 
 func (t *Table) _open() error {
-	if t.env != nil {
+	if t.db != nil {
 		return nil
 	} else if !t.Exists() {
 		return fmt.Errorf("table not found: %s", t.name)
@@ -121,63 +110,44 @@ func (t *Table) _open() error {
 		return fmt.Errorf("table mkdir error: %s", err)
 	}
 
-	// Create LMDB environment.
-	env, err := mdb.NewEnv()
-	assert(err == nil, "table env error: %v", err)
-
-	// LMDB environment settings.
-	err = env.SetMaxDBs(mdb.DBI(t.maxDBs))
-	assert(err == nil, "max dbs (%d) error: %s", t.maxDBs, err)
-	err = env.SetMaxReaders(t.maxReaders)
-	assert(err == nil, "max readers (%d) error: %s", t.maxReaders, err)
-	err = env.SetMapSize(1 << 36)
-	assert(err == nil, "map size error: %s", err)
-
-	// Set LMDB flags.
-	options := uint(mdb.NOTLS)
-	if t.noSync {
-		options |= mdb.NOSYNC
-	}
-
-	// Open the LMDB environment.
-	if err := env.Open(t.path, options, 0600); err != nil {
-		env.Close()
-		return fmt.Errorf("lmdb open error: " + err.Error())
-	}
-	t.env = env
-
-	// Create standard tables.
-	err = t.txn(0, func(txn *transaction) error {
-		err := txn.dbi("meta", 0)
-		assert(err == nil, "meta dbi error: %v", err)
-
-		// Initialize shards.
-		for i := 0; i < t.shardCount; i++ {
-			err := txn.dbi(shardDBName(i), mdb.DUPSORT)
-			assert(err == nil, "shard dbi error: %v", err)
-		}
-		return nil
-	})
+	// Create Bolt database.
+	db, err := bolt.Open(t.path)
 	if err != nil {
-		return err
+		return fmt.Errorf("table open: %s", err)
 	}
+	t.db = db
 
-	// Load the metadata.
-	if err := t.load(); err != nil {
-		t._close()
-		return err
-	}
+	// Initialize schema.
+	err = t.Update(func(tx *Tx) error {
+		// Create meta bucket.
+		if err := tx.CreateBucketIfNotExists([]byte("meta")); err != nil {
+			return fmt.Errorf("meta: %s", err)
+		}
 
-	// Initialize factor databases.
-	err = t.txn(0, func(txn *transaction) error {
+		// Read meta data into table.
+		value := tx.Bucket([]byte("meta")).Get([]byte("meta"))
+		if len(value) > 0 {
+			if err := t.unmarshal(value); err != nil {
+				return err
+			}
+		}
+
+		// Create shard buckets.
+		for i := 0; i < t.shardCount; i++ {
+			if err := txn.CreateBucketIfNotExists(shardDBName(i)); err != nil {
+				return fmt.Errorf("shard: %s", err)
+			}
+		}
+
+		// Create factor buckets.
 		for _, p := range t.properties {
 			if p.DataType != Factor {
 				continue
 			}
-			err := txn.dbi(factorDBName(p.ID), 0)
-			assert(err == nil, "factor dbi error: %v", err)
+			if err := tx.CreateBucketIfNotExists(factorDBName(p.ID)); err != nil {
+				return fmt.Errorf("factor: %s", err)
+			}
 		}
-		return nil
 	})
 	if err != nil {
 		return err
@@ -210,7 +180,7 @@ func (t *Table) drop() error {
 
 // opened returned whether the table is currently open.
 func (t *Table) opened() bool {
-	return t.env != nil
+	return t.db != nil
 }
 
 func (t *Table) close() {
@@ -220,93 +190,97 @@ func (t *Table) close() {
 }
 
 func (t *Table) _close() {
-	if t.env != nil {
-		t.env.Close()
-		t.env = nil
+	if t.db != nil {
+		t.db.Close()
+		t.db = nil
 	}
 }
 
-func (t *Table) load() error {
-	return t.txn(mdb.RDONLY, func(txn *transaction) error {
-		value, err := txn.get("meta", []byte("meta"))
-		if err != nil {
-			return fmt.Errorf("table meta error: %s", err)
-		} else if len(value) == 0 {
-			return nil
-		}
-		// warnf("unmarshal: %s", string(value))
-		if err := t.unmarshal(value); err != nil {
-			return err
-		}
-		return nil
+// View executes a function in the context of a read-only transaction.
+func (t *Table) View(fn func(*Tx) error) error {
+	return t.db.View(func(tx *bolt.Tx) error {
+		return fn(&Tx{tx, t})
 	})
 }
 
-func (t *Table) save() error {
-	return t.txn(0, func(txn *transaction) error {
-		value, err := t.marshal()
-		// warnf("marshal: %s", string(value))
-		assert(err == nil, "table marshal error: %v", err)
-		return txn.put("meta", []byte("meta"), value)
+// Update executes a function in the context of a writable transaction.
+func (t *Table) Update(fn func(*Tx) error) error {
+	return t.db.Update(func(tx *bolt.Tx) error {
+		return fn(&Tx{tx, t})
 	})
+}
+
+// Tx represents a transaction.
+type Tx struct {
+	*bolt.Tx
+	Table *Table
+}
+
+// PutMeta persists the meta data for the table.
+func (tx *Tx) PutMeta() error {
+	value, err := tx.Table.marshal()
+	if err != nil {
+		return fmt.Errorf("marshal: %s", err)
+	}
+	return tx.Bucket([]byte("meta")).Put([]byte("meta"), value)
 }
 
 // Properties retrieves a map of properties by property name.
-func (t *Table) Properties() (map[string]*Property, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+func (tx *Tx) Properties() (map[string]*Property, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
-	return t.properties, nil
+	return tx.Table.properties, nil
 }
 
 // Properties retrieves a map of properties by property identifier.
-func (t *Table) PropertiesByID() (map[int]*Property, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+func (tx *Tx) PropertiesByID() (map[int]*Property, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
-	return t.propertiesByID, nil
+	return tx.Table.propertiesByID, nil
 }
 
 // Property returns a single property from the table with the given name.
-func (t *Table) Property(name string) (*Property, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+func (tx *Tx) Property(name string) (*Property, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
-	return t.properties[name], nil
+	return tx.Table.properties[name], nil
 }
 
 // PropertyByID returns a single property from the table by id.
-func (t *Table) PropertyByID(id int) (*Property, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+func (tx *Tx) PropertyByID(id int) (*Property, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
 	return t.propertiesByID[id], nil
 }
 
 // CreateProperty creates a new property on the table.
-func (t *Table) CreateProperty(name string, dataType string, transient bool) (*Property, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+func (tx *Tx) CreateProperty(name string, dataType string, transient bool) (*Property, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
 
 	// Don't allow duplicate names.
-	if t.properties[name] != nil {
+	if tx.Table.properties[name] != nil {
 		return nil, fmt.Errorf("property already exists: %s", name)
 	}
 
 	// Create and validate property.
 	p := &Property{
-		table:     t,
+		table:     tx.Table,
 		Name:      name,
 		Transient: transient,
 		DataType:  dataType,
@@ -317,34 +291,29 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 
 	// Retrieve the next property id.
 	if transient {
-		t.maxTransientID--
-		p.ID = t.maxTransientID
+		tx.Table.maxTransientID--
+		p.ID = tx.Table.maxTransientID
 	} else {
-		t.maxPermanentID++
-		p.ID = t.maxPermanentID
+		tx.Table.maxPermanentID++
+		p.ID = tx.Table.maxPermanentID
 	}
 
 	// Initialize factor database.
 	if p.DataType == Factor {
-		err := t.txn(0, func(txn *transaction) error {
-			err := txn.dbi(factorDBName(p.ID), 0)
-			assert(err == nil, "factor dbi error: %v", err)
-			return nil
-		})
-		if err != nil {
-			return nil, err
+		if err := tx.CreateBucketIfNotExists(factorDBName(p.ID)); err != nil {
+			return nil, fmt.Errorf("factor: %s", err)
 		}
 	}
 
 	// Add it to the collection.
-	properties, propertiesByID := t.properties, t.propertiesByID
-	t.copyProperties()
-	t.properties[name] = p
-	t.propertiesByID[p.ID] = p
+	properties, propertiesByID := tx.Table.properties, tx.Table.propertiesByID
+	tx.Table.copyProperties()
+	tx.Table.properties[name] = p
+	tx.Table.propertiesByID[p.ID] = p
 
-	if err := t.save(); err != nil {
-		t.properties = properties
-		t.propertiesByID = propertiesByID
+	if err := tx.PutMeta(); err != nil {
+		tx.Table.properties = properties
+		tx.Table.propertiesByID = propertiesByID
 		return nil, err
 	}
 
@@ -357,96 +326,96 @@ func (t *Table) CreateProperty(name string, dataType string, transient bool) (*P
 }
 
 // RenameProperty updates the name of a property.
-func (t *Table) RenameProperty(oldName, newName string) (*Property, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
-	} else if t.properties[oldName] == nil {
+func (tx *Tx) RenameProperty(oldName, newName string) (*Property, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
+	} else if tx.Table.properties[oldName] == nil {
 		return nil, fmt.Errorf("property not found: %s", oldName)
-	} else if t.properties[newName] != nil {
+	} else if tx.Table.properties[newName] != nil {
 		return nil, fmt.Errorf("property already exists: %s", newName)
 	}
 
-	properties := t.properties
-	t.copyProperties()
-	p := t.properties[oldName].Clone()
+	properties := tx.Table.properties
+	tx.Table.copyProperties()
+	p := tx.Table.properties[oldName].Clone()
 	p.Name = newName
 	delete(t.properties, oldName)
-	t.properties[newName] = p
+	tx.Table.properties[newName] = p
 
-	if err := t.save(); err != nil {
-		t.properties = properties
+	if err := tx.Table.PutMeta(); err != nil {
+		tx.Table.properties = properties
 		return nil, err
 	}
 	return p, nil
 }
 
 // DeleteProperty removes a single property from the table.
-func (t *Table) DeleteProperty(name string) error {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return fmt.Errorf("table not open: %s", t.name)
+func (tx *Tx) DeleteProperty(name string) error {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return fmt.Errorf("table not open: %s", tx.Table.name)
 	}
 
-	p := t.properties[name]
+	p := tx.Table.properties[name]
 	if p == nil {
 		return fmt.Errorf("property not found: %s", name)
 	}
 
-	properties, propertiesByID := t.properties, t.propertiesByID
-	t.copyProperties()
-	delete(t.properties, name)
-	delete(t.propertiesByID, p.ID)
+	properties, propertiesByID := tx.Table.properties, tx.Table.propertiesByID
+	tx.copyProperties()
+	delete(tx.Table.properties, name)
+	delete(tx.Table.propertiesByID, p.ID)
 
-	if err := t.save(); err != nil {
-		t.properties = properties
-		t.propertiesByID = propertiesByID
+	if err := tx.PutMeta(); err != nil {
+		tx.Table.properties = properties
+		tx.Table.propertiesByID = propertiesByID
 		return err
 	}
 	return nil
 }
 
 // copyProperties creates a new map and copies all existing properties.
-func (t *Table) copyProperties() {
+func (tx *Tx) copyProperties() {
 	properties := make(map[string]*Property)
-	for k, v := range t.properties {
+	for k, v := range tx.Table.properties {
 		properties[k] = v
 	}
-	t.properties = properties
+	tx.Table.properties = properties
 
 	propertiesByID := make(map[int]*Property)
-	for k, v := range t.propertiesByID {
+	for k, v := range tx.Table.propertiesByID {
 		propertiesByID[k] = v
 	}
-	t.propertiesByID = propertiesByID
+	tx.Table.propertiesByID = propertiesByID
 }
 
-// GetEvent returns a single event for an object at a given timestamp.
-func (t *Table) GetEvent(id string, timestamp time.Time) (*Event, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+// Event returns a single event for an object at a given timestamp.
+func (tx *Tx) Event(id string, timestamp time.Time) (*Event, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
 
-	rawEvent, err := t.getRawEvent(id, shiftTime(timestamp))
+	rawEvent, err := tx.getRawEvent(id, shiftTime(timestamp))
 	if err != nil {
 		return nil, err
 	} else if rawEvent == nil {
 		return nil, nil
 	}
 
-	return t.toEvent(rawEvent)
+	return tx.Table.toEvent(rawEvent)
 }
 
-// GetEvents returns all events for an object in chronological order.
-func (t *Table) GetEvents(id string) ([]*Event, error) {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
-		return nil, fmt.Errorf("table not open: %s", t.name)
+// Events returns all events for an object in chronological order.
+func (tx *Tx) Events(id string) ([]*Event, error) {
+	tx.Table.Lock()
+	defer tx.Table.Unlock()
+	if !tx.Table.opened() {
+		return nil, fmt.Errorf("table not open: %s", tx.Table.name)
 	}
 
 	// Retrieve raw events.
@@ -880,13 +849,13 @@ func (t *Table) shardIndex(id string) int {
 }
 
 // shardDBName returns the name of the shard table.
-func shardDBName(index int) string {
-	return fmt.Sprintf("shards/%d", index)
+func shardDBName(index int) []byte {
+	return []byte(fmt.Sprintf("shards/%d", index))
 }
 
 // factorDBName returns the name of the factor table for a property.
-func factorDBName(propertyID int) string {
-	return fmt.Sprintf("factors/%d", propertyID)
+func factorDBName(propertyID int) []byte {
+	return []byte(fmt.Sprintf("factors/%d", propertyID))
 }
 
 // factorKey returns the value-to-index key.
@@ -971,22 +940,6 @@ func (t *Table) unmarshal(data []byte) error {
 		t.propertiesByID[p.ID] = p
 	}
 
-	return nil
-}
-
-// txn executes a function within the context of a LMDB transaction.
-func (t *Table) txn(flags uint, fn func(*transaction) error) error {
-	txn, err := t.env.BeginTxn(nil, flags)
-	if err != nil {
-		return fmt.Errorf("txn error: %s", err)
-	}
-	if err := fn(&transaction{txn}); err != nil {
-		txn.Abort()
-		return err
-	}
-	if err := txn.Commit(); err != nil {
-		return fmt.Errorf("txn commit error: %s", err)
-	}
 	return nil
 }
 

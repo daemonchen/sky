@@ -13,8 +13,5 @@ forms the schema. Properties can have one of five data types:
 	Float    - IEEE754 Double precision 64-bit number
 	Boolean  - Stores true or false.
 
-Because of limitations with the underlying LMDB storage engine, we advise
-against using the String data type. Please use the Factor instead.
-
 */
 package db
