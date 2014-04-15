@@ -3,18 +3,14 @@ package sky
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"runtime"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/skydb/sky/hash"
-	"github.com/ugorji/go/codec"
 )
 
 var (
@@ -36,37 +32,38 @@ type DB struct {
 
 // Path returns the location of the table on disk.
 func (db *DB) Path() string {
-	return t.path
+	return db.path
 }
 
 // ShardCount returns the number of shards in the table.
 func (db *DB) ShardCount() int {
-	return t.shardCount
+	if db.shardCount == 0 {
+		db.shardCount = runtime.NumCPU()
+	}
+	return db.shardCount
 }
 
 // Open opens and initializes the table.
 func (db *DB) Open() error {
-	t.Lock()
-	defer t.Unlock()
+	db.Lock()
+	defer db.Unlock()
 
-	if t.db != nil {
+	if db.db != nil {
 		return nil
-	} else if !t.Exists() {
-		return fmt.Errorf("table not found: %s", t.name)
 	}
 
 	// Create Bolt database.
-	db, err := bolt.Open(t.path)
+	boltdb, err := bolt.Open(db.path, 0666)
 	if err != nil {
 		return fmt.Errorf("table open: %s", err)
 	}
-	t.db = db
+	db.db = boltdb
 
 	// Initialize schema.
-	err = t.Update(func(tx *Tx) error {
+	err = db.Update(func(tx *Tx) error {
 		// Create shard buckets.
-		for i := 0; i < t.shardCount; i++ {
-			if err := txn.CreateBucketIfNotExists(shardDBName(i)); err != nil {
+		for i := 0; i < db.ShardCount(); i++ {
+			if err := tx.CreateBucketIfNotExists(shardDBName(i)); err != nil {
 				return fmt.Errorf("shard: %s", err)
 			}
 		}
@@ -89,14 +86,14 @@ func (db *DB) Close() {
 
 // View executes a function in the context of a read-only transaction.
 func (db *DB) View(fn func(*Tx) error) error {
-	return t.db.View(func(tx *bolt.Tx) error {
+	return db.db.View(func(tx *bolt.Tx) error {
 		return fn(&Tx{tx, db})
 	})
 }
 
 // Update executes a function in the context of a writable transaction.
 func (db *DB) Update(fn func(*Tx) error) error {
-	return t.db.Update(func(tx *bolt.Tx) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
 		return fn(&Tx{tx, db})
 	})
 }
@@ -109,20 +106,18 @@ type Tx struct {
 
 // Event returns a single event for an object at a given timestamp.
 func (tx *Tx) Event(id string, timestamp time.Time) (*Event, error) {
-	rawEvent, err := tx.getRawEvent(id, shiftTime(timestamp))
+	rawEvent, err := tx.getRawEvent(id, timestamp.UnixNano())
 	if err != nil {
 		return nil, err
-	} else if rawEvent == nil {
-		return nil, nil
 	}
 
-	return tx.Table.toEvent(rawEvent)
+	return &Event{timestamp: timestamp, data: rawEvent.data}, nil
 }
 
 // Events returns all events for an object in chronological order.
 func (tx *Tx) Events(id string) ([]*Event, error) {
 	// Retrieve raw events.
-	rawEvents, err := t.getRawEvents(id)
+	rawEvents, err := tx.getRawEvents(id)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +125,7 @@ func (tx *Tx) Events(id string) ([]*Event, error) {
 	// Convert to regular events and return.
 	var events []*Event
 	for _, rawEvent := range rawEvents {
-		event, err := t.toEvent(rawEvent)
+		event, err := tx.toEvent(rawEvent)
 		if err != nil {
 			return nil, err
 		}
@@ -144,36 +139,23 @@ func (tx *Tx) getRawEvent(id string, timestamp int64) (*rawEvent, error) {
 		return nil, ErrObjectIDRequired
 	}
 
-	var stat = bench()
+	shard := tx.Bucket(tx.DB.shardDBName(shardIndex(id)))
+
+	object := shard.Bucket(prefix)
+	if object == nil {
+		return nil, fmt.Errorf("object key not found: %s", id)
+	}
+
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, timestamp)
 	prefix := buf.Bytes()
 
-	// Retrieve event bytes from the database.
-	var b []byte
-	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
-		var err error
-		b, err = txn.getAt(shardDBName(t.shardIndex(id)), []byte(id), prefix)
-		return err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("get raw event error: %s", err)
-	} else if b == nil {
-		return nil, nil
+	event := object.Get(prefix)
+	if event == nil {
+		return nil, fmt.Errorf("event not found: %d", timestamp)
 	}
-	stat.count++
-	stat.apply(&t.stat.Event.Fetch.Count, &t.stat.Event.Fetch.Duration)
 
-	// Unmarshal bytes into a raw event.
-	stat = bench()
-	e := &rawEvent{}
-	if err := e.unmarshal(b); err != nil {
-		return nil, err
-	}
-	stat.count++
-	stat.apply(&t.stat.Event.Unmarshal.Count, &t.stat.Event.Unmarshal.Duration)
-
-	return e, nil
+	return &rawEvent{timestamp: timestamp, data: event}, nil
 }
 
 func (tx *Tx) getRawEvents(id string) ([]*rawEvent, error) {
@@ -184,7 +166,7 @@ func (tx *Tx) getRawEvents(id string) ([]*rawEvent, error) {
 	// Retrieve all bytes from the database.
 	var stat = bench()
 	var slices [][]byte
-	err := t.txn(mdb.RDONLY, func(txn *transaction) error {
+	err := tx.txn(mdb.RDONLY, func(txn *transaction) error {
 		var err error
 		slices, err = txn.getAll(shardDBName(t.shardIndex(id)), []byte(id))
 		return err
@@ -195,7 +177,7 @@ func (tx *Tx) getRawEvents(id string) ([]*rawEvent, error) {
 		return nil, nil
 	}
 	stat.count += len(slices)
-	stat.apply(&t.stat.Event.Fetch.Count, &t.stat.Event.Fetch.Duration)
+	stat.apply(&tx.stat.Event.Fetch.Count, &tx.stat.Event.Fetch.Duration)
 
 	// Unmarshal each slice into a raw event.
 	stat = bench()
@@ -208,18 +190,18 @@ func (tx *Tx) getRawEvents(id string) ([]*rawEvent, error) {
 		events = append(events, e)
 	}
 	stat.count += len(events)
-	stat.apply(&t.stat.Event.Unmarshal.Count, &t.stat.Event.Unmarshal.Duration)
+	stat.apply(&tx.stat.Event.Unmarshal.Count, &tx.stat.Event.Unmarshal.Duration)
 	return events, nil
 }
 
 // InsertEvent inserts an event for an object.
 func (tx *Tx) InsertEvent(id string, event *Event) error {
-	t.Lock()
-	defer t.Unlock()
-	if !t.opened() {
+	tx.Lock()
+	defer tx.Unlock()
+	if !tx.opened() {
 		return fmt.Errorf("table not open: %s", t.name)
 	}
-	return t.insertEvent(id, event)
+	return tx.insertEvent(id, event)
 }
 
 // InsertEvents inserts multiple events for an object.
@@ -342,7 +324,7 @@ func (tx *Tx) ForEach(fn func(c *Cursor)) error {
 	if !t.opened() {
 		return fmt.Errorf("table not open: %s", t.name)
 	}
-	for i := 0; i < t.shardCount; i++ {
+	for i := 0; i < t.DB.ShardCount(); i++ {
 		txn, err := t.env.BeginTxn(nil, mdb.RDONLY)
 		if err != nil {
 			return fmt.Errorf("foreach txn error: %s", err)
@@ -382,7 +364,7 @@ func (tx *Tx) Keys() ([]string, error) {
 
 // shardIndex returns the appropriate shard for a given object id.
 func (db *DB) shardIndex(id string) int {
-	return int(hash.Local(id)) % t.shardCount
+	return int(hash.Local(id)) % db.ShardCount()
 }
 
 // shardDBName returns the name of the shard table.
@@ -392,14 +374,14 @@ func shardDBName(index int) []byte {
 
 // Event represents the state for an object at a given point in time.
 type Event struct {
-	Timestamp time.Time              `json:"timestamp"`
-	Data      map[string]interface{} `json:"data"`
+	Timestamp time.Time
+	Data      []byte
 }
 
 // rawEvent represents an internal event structure.
 type rawEvent struct {
 	timestamp int64
-	data      map[int]interface{}
+	data      []byte
 }
 
 // stat represents a simple counter and timer.
